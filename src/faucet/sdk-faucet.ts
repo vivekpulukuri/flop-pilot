@@ -54,7 +54,14 @@ export function createFaucet(n: Network, env: Env, sdk: FaucetSdk = realSdk): Fa
   };
   return {
     async chain() { return (await getJson('/chain')) as { network: string; genesisHash: string }; },
-    async limits() { return parseLimits(await getJson('/limits')); },
+    async limits() {
+      const j = await getJson('/limits');
+      const l = parseLimits(j);
+      if (n !== 'devnet') return l;
+      // Devnet funding uses the anonymous POST /fund tier (devnet findings Q8), not the agent tier.
+      const anon = (j as { faucet?: { anonymous?: { grantFlop?: number; addressCooldownSeconds?: number }; status?: string } }).faucet?.anonymous;
+      return anon ? { ...l, status: String((j as any).faucet?.status ?? l.status), grantFlop: Number(anon.grantFlop ?? l.grantFlop), cooldownSeconds: Number(anon.addressCooldownSeconds ?? l.cooldownSeconds), rolloverRequiresSpend: false } : l;
+    },
     async claim(address, o) {
       if (n === 'testnet') return mapResult(await sdk.claimTestnetAgentFunds(address, { nonce: o.nonce, sign: o.sign }), o.nonce);
       // Devnet has no signed agent-claim route (devnet findings Q8).

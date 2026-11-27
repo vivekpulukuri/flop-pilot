@@ -4,7 +4,7 @@ Status: draft, awaiting approval · Date: 2026-11-27 · Approach chosen: **A (Ty
 
 ## 1. Intent and why
 
-The owner is new to crypto and wants to be as useful as possible to the FLOP Testnet as an
+The tool is for people new to crypto who want to be as useful as possible to the FLOP Testnet as an
 **agent**. Each day: claim the most FLOP the faucet allows, then spend all of it on real
 inference bought from independent miners, without breaking any program rule and without
 missing a day once voucher earning starts.
@@ -15,10 +15,10 @@ They want:
 - an **autopilot** that checks the faucet limits, balances and rules by itself;
 - a **local dashboard** with full visibility (per-wallet metrics, claims, spends,
   transactions, origin IP) and full controls;
-- a **step-by-step guide** that novice friends can follow on their own machines to set up
+- a **step-by-step guide** that people new to crypto can follow on their own machines to set up
   their own copy.
 
-Success means a novice friend can go from nothing to a running autopilot by copy-pasting
+Success means a newcomer can go from nothing to a running autopilot by copy-pasting
 from the guide, and after that each install claims and spends its full allowance every day
 with no action needed. The dashboard shows what happened and why.
 

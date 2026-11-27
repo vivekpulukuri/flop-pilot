@@ -1,4 +1,5 @@
 import { existsSync, accessSync, constants } from 'node:fs';
+import { dirname } from 'node:path';
 import type { ChainPort, SecretStore } from '../core/types.js';
 import { loadConfig } from '../core/config.js';
 import { paths } from '../core/paths.js';
@@ -62,7 +63,7 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
 
   if (d.cliPath) {
     const blocked = protectedFolder(d.cliPath);
-    out.push({ name: 'Install location works with the autopilot', ok: !blocked, detail: d.cliPath, fix: blocked ? protectedFolderHint(blocked) : undefined });
+    out.push({ name: 'Install location works with the autopilot', ok: !blocked, detail: d.cliPath, fix: blocked ? protectedFolderHint(blocked, dirname(dirname(d.cliPath))) : undefined });
   }
 
   const loaded = await d.launchdLoaded().catch(() => false);

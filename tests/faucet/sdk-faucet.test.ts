@@ -64,3 +64,9 @@ test('devnet claim uses requestFaucetFunding and never signs', async () => {
   expect(signed).toBe(0);
   expect(calls[0]).toEqual(['5A', { network: 'devnet', client: 'flop-pilot' }]);
 });
+
+test('devnet limits use the anonymous POST /fund tier (25 FLOP, no rollover rule)', async () => {
+  const env = fakeEnv();
+  env.fetch = (async () => new Response(JSON.stringify({ network: 'devnet', faucet: { status: 'open', dailyCap: { limitFlop: '10000000', usedFlop: '251790', remainingFlop: '9748210' }, anonymous: { grantFlop: 25, addressCooldownSeconds: 86400 }, agent: { grantFlop: 2, cooldownSeconds: 86400, rolloverRequiresSpend: true }, perClient: { ipGrantsPerDay: 300 } }, asOf: 'x' }))) as typeof fetch;
+  expect(await createFaucet('devnet', env).limits()).toMatchObject({ grantFlop: 25, cooldownSeconds: 86400, rolloverRequiresSpend: false, status: 'open' });
+});

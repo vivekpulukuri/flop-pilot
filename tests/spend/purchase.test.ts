@@ -118,3 +118,8 @@ test('the intent secret never appears in the ledger', async () => {
   expect(JSON.stringify(ctx.ledger.activity('testnet', { limit: 50 }))).not.toContain('s3cr3t');
   expect(readFileSync(paths(ctx.home).ledger, 'latin1')).not.toContain('s3cr3t');
 });
+
+test('no-miner message is plain English, not JSON', async () => {
+  const r = await spendWallet(ctx, wallets[0], { chain: funded(), miners: fakeMiners([{ ...MINER, url: null }, { ...MINER, address: '5B', url: null }, { ...MINER, address: '5C', linkedAccounts: null }]) });
+  expect(r[0].detail).toBe('wallet #0: no miner to buy from yet. 3 miners found: 2 have no endpoint added yet, 1 could not be checked for independence. Add a miner endpoint on the Controls page.');
+});

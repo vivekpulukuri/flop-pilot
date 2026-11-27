@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 export const LAUNCHD_LABEL = 'io.floppilot.autopilot';
 const run = promisify(execFile);
@@ -34,10 +34,10 @@ export function protectedFolder(path: string): string | null {
   return null;
 }
 
-export function protectedFolderHint(name: string): string {
+export function protectedFolderHint(name: string, projectDir: string): string {
   return `The flop-pilot folder is inside your ${name} folder. macOS blocks background jobs from reading ${name}, so the autopilot would hang. `
     + 'Please move the flop-pilot folder to your home folder, then turn the autopilot on again:\n'
-    + '  mv "$PWD" ~/flop-pilot && cd ~/flop-pilot && npm ci && npm link && flop-pilot autopilot on';
+    + `  mv "${projectDir}" ~/flop-pilot && cd ~/flop-pilot && npm ci && node dist/cli.js autopilot on`;
 }
 
 export function plistPath(label: string, agentsDir = join(homedir(), 'Library', 'LaunchAgents')): string {
@@ -84,7 +84,7 @@ export async function isLoaded(label = LAUNCHD_LABEL, exec: Exec = realExec): Pr
 
 export async function installAgent(o: { home: string; nodePath: string; cliPath: string; intervalSec: number; exec?: Exec; agentsDir?: string }): Promise<string> {
   const blocked = protectedFolder(o.cliPath);
-  if (blocked) throw new Error(protectedFolderHint(blocked));
+  if (blocked) throw new Error(protectedFolderHint(blocked, dirname(dirname(o.cliPath))));
   const exec = o.exec ?? realExec;
   const label = launchdLabel(o.home);
   const file = plistPath(label, o.agentsDir);

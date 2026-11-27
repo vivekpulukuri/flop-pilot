@@ -67,6 +67,22 @@ export async function purchaseOne(ctx: Ctx, w: Wallet, miner: MinerInfo & { url:
   return finishBuy(ctx, row, f, w, chain);
 }
 
+const REASONS: [string, string, string][] = [
+  ['no_endpoint', 'has no endpoint added yet', 'have no endpoint added yet'],
+  ['unverified', 'could not be checked for independence', 'could not be checked for independence'],
+  ['own_address', 'is one of your own wallets', 'are your own wallets'],
+  ['declared_own', 'is on your own-miners list', 'are on your own-miners list'],
+  ['linked', 'is linked to your wallets', 'are linked to your wallets'],
+];
+
+function noMinerText(found: number, ranked: { miner: MinerInfo; result: string }[]): string {
+  if (!found) return 'no miner to buy from yet. No miners found on this network. Add a miner endpoint on the Controls page.';
+  const counts = new Map<string, number>();
+  for (const r of ranked) { const k = r.result === 'independent' && !r.miner.url ? 'no_endpoint' : r.result; counts.set(k, (counts.get(k) ?? 0) + 1); }
+  const parts = REASONS.filter(([k]) => counts.get(k)).map(([k, one, many]) => `${counts.get(k)} ${counts.get(k) === 1 ? one : many}`);
+  return `no miner to buy from yet. ${found} miner${found === 1 ? '' : 's'} found: ${parts.join(', ')}. Add a miner endpoint on the Controls page.`;
+}
+
 export async function spendWallet(ctx: Ctx, w: Wallet, ports: { chain: ChainPort; miners: MinerDirectory }): Promise<ActionResult[]> {
   const base = { wallet: w.index, action: 'spend' as const };
   const row = ctx.ledger.listWallets(ctx.network).find((r) => r.idx === w.index);
@@ -85,8 +101,7 @@ export async function spendWallet(ctx: Ctx, w: Wallet, ports: { chain: ChainPort
   const ranked = eligibleMiners(listed, own, new Set(ctx.config.myMiners));
   const usable = ranked.filter((r) => r.result === 'independent' && r.miner.url).map((r) => r.miner as MinerInfo & { url: string });
   if (!usable.length) {
-    const counts = ranked.reduce<Record<string, number>>((a, r) => { const k = r.miner.url ? r.result : `${r.result}/no endpoint`; a[k] = (a[k] ?? 0) + 1; return a; }, {});
-    return [{ ...base, kind: 'skipped', reason: 'no_independent_miner', detail: `wallet #${w.index}: no independent miner with an endpoint (${listed.length} miners found: ${JSON.stringify(counts)})` }];
+    return [{ ...base, kind: 'skipped', reason: 'no_independent_miner', detail: `wallet #${w.index}: ${noMinerText(listed.length, ranked)}` }];
   }
   const out: ActionResult[] = [];
   for (const [i, escrow] of sessions.entries()) {

@@ -57,3 +57,11 @@ test('uninstallAgent boots the job out AND deletes the plist so it does not come
   expect(existsSync(file)).toBe(false);
   expect(calls.at(-1)![0]).toBe('bootout');
 });
+
+test('protectedFolderHint names the real project folder, not $PWD', async () => {
+  const { protectedFolderHint } = await import('../../src/autopilot/launchd.js');
+  const h = protectedFolderHint('Documents', '/Users/a/Documents/flop-pilot');
+  expect(h).toContain('mv "/Users/a/Documents/flop-pilot" ~/flop-pilot');
+  expect(h).not.toContain('$PWD');
+  expect(h).not.toContain('npm link');
+});
