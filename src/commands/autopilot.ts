@@ -9,10 +9,15 @@ import { NETWORKS } from '../core/types.js';
 import { paths } from '../core/paths.js';
 import { openLedger } from '../ledger/ledger.js';
 import { acquireLock, releaseLock } from '../autopilot/lock.js';
+import { runTick, type TickSummary } from '../autopilot/tick.js';
+import { unlockSeed } from '../keys/vault.js';
 
 const CLI_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'cli.js');
 
+export const PASSPHRASE_NO_BACKGROUND = "Passphrase mode can't unlock your wallets in the background. Keep a Terminal window open and run: npm run autopilot:run (on a server, run it inside tmux or screen so it keeps going after you log out).";
+
 export async function autopilotOn(home: string): Promise<string> {
+  if (loadConfig(home).unlock === 'passphrase') throw new Error(PASSPHRASE_NO_BACKGROUND);
   updateConfig(home, { killed: false, paused: false });
   const c = loadConfig(home);
   return installAgent({ home, nodePath: process.execPath, cliPath: CLI_PATH, intervalSec: c.tickMinutes * 60 });
@@ -49,6 +54,17 @@ export function actionGate(ctx: Ctx, o: { checkLock?: boolean } = {}): string | 
 export async function withActionLock<T>(ctx: Ctx, f: () => Promise<T>): Promise<T> {
   if (!acquireLock(paths(ctx.home).lock)) throw new Error('The autopilot is running right now. Try again in a minute.');
   try { return await f(); } finally { releaseLock(paths(ctx.home).lock); }
+}
+
+/** Foreground autopilot: unlock once (passphrase or store), then tick every interval until stopped. */
+export async function runLoop(deps: RuntimeDeps, o: { intervalMs: number; maxTicks?: number; onTick?: (s: TickSummary) => void; signal?: AbortSignal }): Promise<void> {
+  await unlockSeed(deps.home, deps.store); // fails fast on a wrong passphrase
+  for (let n = 1; !o.signal?.aborted; n++) {
+    const s = await runTick(deps);
+    o.onTick?.(s);
+    if (o.maxTicks && n >= o.maxTicks) break;
+    await new Promise<void>((res) => { const t = setTimeout(res, o.intervalMs); o.signal?.addEventListener('abort', () => { clearTimeout(t); res(); }, { once: true }); });
+  }
 }
 
 export async function autopilotOff(home: string): Promise<void> {

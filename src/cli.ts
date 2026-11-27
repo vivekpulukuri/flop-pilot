@@ -10,7 +10,11 @@ import { paths } from './core/paths.js';
 import { runInit } from './commands/init.js';
 import { setClaimers, setNetwork, setPractice } from './commands/settings.js';
 import { listWalletsCmd } from './commands/wallets.js';
-import { terminalIO } from './sys/prompt.js';
+import { terminalIO, askHidden } from './sys/prompt.js';
+import { storeFor, setUnlockMode, passphraseStore } from './platform/passphrase.js';
+import { secretStoreFor, currentPlat } from './platform/secrets.js';
+import { realExec } from './sys/exec.js';
+import { unlockSeed } from './keys/vault.js';
 import { realEnv } from './sys/env.js';
 import { createSdkChain, isSupportedSpec } from './chain/sdk-chain.js';
 import { NETWORK_PROFILES } from './core/networks.js';
@@ -23,7 +27,7 @@ import { runEnroll } from './commands/enroll.js';
 import { runSpend } from './commands/spend.js';
 import { setActivationBlock } from './watchers/mode.js';
 import { runTick } from './autopilot/tick.js';
-import { autopilotOn, autopilotOff, autopilotStatus, stopAll, resumeAll } from './commands/autopilot.js';
+import { autopilotOn, autopilotOff, autopilotStatus, stopAll, resumeAll, runLoop } from './commands/autopilot.js';
 import { updateConfig } from './core/config.js';
 import { serveDashboard } from './commands/dashboard.js';
 import { runUpdate } from './commands/update.js';
@@ -38,7 +42,8 @@ import type { RuntimeDeps } from './runtime.js';
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
 export const VERSION = pkg.version;
 
-const keychain = (home: string) => macKeychain(undefined, keychainAccount(home));
+const osStore = (home: string) => secretStoreFor(home, { plat: currentPlat(), exec: realExec, env: process.env });
+const keychain = (home: string) => storeFor(home, { ask: process.stdin.isTTY ? () => askHidden('Passphrase: ') : null });
 function requireSetup(home: string): void {
   if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: npm run init');
 }
@@ -56,9 +61,18 @@ program.command('init')
   .description('Create your 24-word seed phrase, the encrypted vault and 3 wallets')
   .option('--restore', 'restore from an existing 24-word seed phrase')
   .option('--network <network>', 'devnet or testnet', 'devnet')
-  .action(async (o: { restore?: boolean; network: Network }) => {
+  .option('--passphrase', 'unlock with a passphrase you write on paper (nothing stored)')
+  .action(async (o: { restore?: boolean; network: Network; passphrase?: boolean }) => {
+    if (o.network !== 'devnet' && o.network !== 'testnet') throw new Error('--network must be devnet or testnet');
     const io = await terminalIO();
-    try { await runInit({ home: pilotHome(), network: o.network, restore: !!o.restore, io, store: keychain(pilotHome()) }); }
+    try {
+      let unlock: 'auto' | 'passphrase' = o.passphrase ? 'passphrase' : 'auto';
+      if (!o.passphrase && process.stdin.isTTY) {
+        const a = (await io.ask('How should FLOP Pilot unlock your wallets?\n  1) Automatically: kept safely on this computer (recommended; lets the autopilot run in the background)\n  2) A passphrase you write on paper and type each time you start it\nChoose 1 or 2 [1]: ')).trim();
+        if (a === '2') unlock = 'passphrase';
+      }
+      await runInit({ home: pilotHome(), network: o.network, restore: !!o.restore, io, store: osStore(pilotHome()), unlock });
+    }
     finally { io.close(); }
   });
 
@@ -103,7 +117,7 @@ program.command('doctor')
     const c = loadConfig(home);
     const env = realEnv({ version: VERSION });
     const checks = await runDoctor({
-      home, store: keychain(home), nodeVersion: process.version, platform: process.platform,
+      home, store: keychain(home), storeKind: keychain(home), nodeVersion: process.version, platform: process.platform,
       chain: () => createSdkChain(c.network),
       faucetChain: async () => (await (await env.fetch(`${NETWORK_PROFILES[c.network].faucet}/chain`, { signal: AbortSignal.timeout(15000) })).json()) as { network: string; genesisHash: string },
       launchdLoaded: () => isLoaded(launchdLabel(home)), isSupportedSpec, cliPath: fileURLToPath(import.meta.url),
@@ -165,6 +179,23 @@ program.command('tick')
 
 const ap = program.command('autopilot').description('Background autopilot (runs every 15 minutes)');
 ap.command('on').action(async () => { requireSetup(pilotHome()); const f = await autopilotOn(pilotHome()); console.log(`Autopilot ON (runs every ${loadConfig(pilotHome()).tickMinutes} min). Agent file: ${f}`); });
+ap.command('run')
+  .description('Run the autopilot in this window (needed in passphrase mode; Ctrl+C to stop)')
+  .action(async () => {
+    requireSetup(pilotHome());
+    const home = pilotHome();
+    const c = loadConfig(home);
+    const d = deps();
+    if (c.unlock === 'passphrase') { const pw = await askHidden('Passphrase: '); d.store = passphraseStore(async () => pw); }
+    const ac = new AbortController();
+    process.on('SIGINT', () => { console.log('\nStopping after this run…'); ac.abort(); });
+    console.log(`Autopilot running every ${c.tickMinutes} min. Keep this window open. Press Control+C to stop.`);
+    await runLoop(d, { intervalMs: c.tickMinutes * 60_000, signal: ac.signal, onTick: (s) => {
+      console.log(`[${new Date().toISOString()}] ${s.skippedAll ? `skipped: ${s.skippedAll}` : `mode ${s.mode ?? 'unknown'}`}`);
+      if (s.actions.length) console.log(formatResults(s.actions));
+      for (const e of s.errors) console.log(`! ${e}`);
+    } });
+  });
 ap.command('off').action(async () => { await autopilotOff(pilotHome()); console.log('Autopilot OFF.'); });
 ap.command('status').action(async () => {
   requireSetup(pilotHome());
@@ -193,7 +224,13 @@ program.command('dashboard')
   .option('--no-open', 'print the link instead of opening the browser')
   .action(async (o: { open: boolean }) => {
     requireSetup(pilotHome());
-    await serveDashboard({ home: pilotHome(), env: realEnv({ version: VERSION }), store: keychain(pilotHome()), makeChain: (n) => createSdkChain(n), open: o.open });
+    const home = pilotHome();
+    let store: import('./core/types.js').SecretStore | undefined = keychain(home);
+    if (loadConfig(home).unlock === 'passphrase') {
+      const pw = process.stdin.isTTY ? await askHidden('Passphrase (press Return to skip; the Claim now / Spend now buttons need it): ') : '';
+      if (pw) { store = passphraseStore(async () => pw); await unlockSeed(home, store); } else store = undefined;
+    }
+    await serveDashboard({ home, env: realEnv({ version: VERSION }), store, makeChain: (n) => createSdkChain(n), open: o.open });
   });
 
 program.command('update')
@@ -220,6 +257,19 @@ program.command('export')
     const file = `flop-pilot-export-${new Date().toISOString().slice(0, 10)}.${format}`;
     writeFileSync(file, runExport(pilotHome(), { format, withIp: !!o.withIp, network: loadConfig(pilotHome()).network }));
     console.log(`Saved ${file}`);
+  });
+
+program.command('unlock <mode>')
+  .description('Switch how your wallets unlock: auto or passphrase')
+  .action(async (mode: string) => {
+    requireSetup(pilotHome());
+    if (mode !== 'auto' && mode !== 'passphrase') throw new Error('Use: npm run unlock:auto   or   npm run unlock:passphrase');
+    const io = await terminalIO();
+    try {
+      await setUnlockMode(pilotHome(), mode, { current: keychain(pilotHome()), auto: osStore(pilotHome()), io });
+      console.log(mode === 'passphrase' ? 'Done. From now on, start the autopilot with: npm run autopilot:run' : 'Done. You can now run: npm run autopilot:on');
+      if (mode === 'passphrase') await autopilotOff(pilotHome()).catch(() => {});
+    } finally { io.close(); }
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {

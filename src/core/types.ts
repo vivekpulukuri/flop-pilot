@@ -24,6 +24,8 @@ export interface Config {
   minerEndpoints: MinerEndpoint[];
   activationBlock: Record<Network, number | null>;
   dashboardPort: number;
+  /** auto: vault password kept in the OS store; passphrase: owner types a passphrase written on paper. */
+  unlock: 'auto' | 'passphrase';
 }
 
 export interface FaucetLimits {

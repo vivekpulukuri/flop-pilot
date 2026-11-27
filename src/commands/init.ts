@@ -10,8 +10,12 @@ import { openLedger } from '../ledger/ledger.js';
 export interface PromptIO {
   print(s: string): void;
   ask(q: string): Promise<string>;
+  /** Like ask, but the typed text is not shown on screen. */
+  askSecret?(q: string): Promise<string>;
   clear(): void;
 }
+
+export const MIN_PASSPHRASE = 12;
 
 export const WALLET_COUNT = 3;
 const CONFIRM_WORDS = 3;
@@ -34,7 +38,7 @@ function grid(words: string[]): string {
   return rows.join('\n');
 }
 
-export async function runInit(o: { home: string; network: Network; restore: boolean; io: PromptIO; store: SecretStore; rng?: () => number }): Promise<void> {
+export async function runInit(o: { home: string; network: Network; restore: boolean; io: PromptIO; store: SecretStore; rng?: () => number; unlock?: 'auto' | 'passphrase' }): Promise<void> {
   const { home, io } = o;
   const rng = o.rng ?? Math.random;
   if (existsSync(paths(home).vault)) {
@@ -66,12 +70,30 @@ export async function runInit(o: { home: string; network: Network; restore: bool
     if (!ok) throw new Error('The words did not match after 3 tries. Setup cancelled; nothing was saved. Run `npm run init` again.');
   }
 
+  const unlock = o.unlock ?? 'auto';
+  let pw: string;
+  if (unlock === 'passphrase') {
+    const secret = io.askSecret ?? io.ask;
+    let chosen: string | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !chosen; attempt++) {
+      const p1 = await secret(`Choose a passphrase (at least ${MIN_PASSPHRASE} characters): `);
+      if (p1.length < MIN_PASSPHRASE) { io.print(`Too short. Use at least ${MIN_PASSPHRASE} characters, for example four random words.`); continue; }
+      const p2 = await secret('Type the same passphrase again: ');
+      if (p1 !== p2) { io.print("The two didn't match. Let's try again."); continue; }
+      chosen = p1;
+    }
+    if (!chosen) throw new Error('No passphrase was set after 3 tries. Setup cancelled; nothing was saved. Run `npm run init` again.');
+    io.print('\nWrite this passphrase on paper, next to your 24 words. It is not saved on this computer: you type it whenever you start FLOP Pilot.\n');
+    pw = chosen;
+  } else {
+    pw = newVaultPassword();
+  }
+
   ensureDirs(home);
-  const pw = newVaultPassword();
-  await o.store.set(pw);
+  if (unlock === 'auto') await o.store.set(pw);
   writeVault(paths(home).vault, encryptSeed(seed, pw));
 
-  const config = { ...loadConfig(home), network: o.network, practice: true };
+  const config = { ...loadConfig(home), network: o.network, practice: true, unlock };
   saveConfig(home, config);
 
   const ledger = openLedger(paths(home).ledger);

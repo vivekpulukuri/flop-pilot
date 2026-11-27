@@ -19,7 +19,10 @@ export interface DoctorDeps {
   launchdLoaded: () => Promise<boolean>;
   isSupportedSpec: (v: number) => boolean;
   cliPath?: string;
+  storeKind?: { kind: string; weak: boolean };
 }
+
+const STORE_NAMES: Record<string, string> = { keychain: 'macOS Keychain', dpapi: 'Windows DPAPI', 'secret-service': 'desktop keyring', 'key-file': 'key file', passphrase: 'your passphrase (typed at start)' };
 
 export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
   const out: Check[] = [];
@@ -31,7 +34,13 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
 
   const hasVault = existsSync(paths(d.home).vault);
   out.push({ name: 'Set up (init done)', ok: hasVault, fix: 'Run: npm run init' });
-  if (hasVault) {
+  if (d.storeKind) {
+    out.push({ name: 'Password store', ok: true, warn: d.storeKind.weak, detail: STORE_NAMES[d.storeKind.kind] ?? d.storeKind.kind,
+      fix: d.storeKind.weak ? 'This computer has no keyring, so the vault password is in ~/.flop-pilot/vault.key. Anyone who can log in as you can read it. Prefer a passphrase written on paper? Run: npm run unlock:passphrase' : undefined });
+  }
+  if (hasVault && c.unlock === 'passphrase') {
+    out.push({ name: 'Vault unlocks', ok: true, detail: 'passphrase mode: you type it when you start' });
+  } else if (hasVault) {
     try { await unlockSeed(d.home, d.store); out.push({ name: 'Vault unlocks', ok: true }); }
     catch (e) { out.push({ name: 'Vault unlocks', ok: false, detail: (e as Error).message, fix: 'Unlock your Mac Keychain, or restore with: npm run init:restore' }); }
   }

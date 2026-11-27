@@ -46,7 +46,11 @@
     "activation": "node dist/cli.js activation",
     "update": "node dist/cli.js update",
     "export": "node dist/cli.js export",
-    "pilot": "node dist/cli.js"
+    "pilot": "node dist/cli.js",
+    "init:passphrase": "node dist/cli.js init --passphrase",
+    "autopilot:run": "node dist/cli.js autopilot run",
+    "unlock:passphrase": "node dist/cli.js unlock passphrase",
+    "unlock:auto": "node dist/cli.js unlock auto"
   },
   "files": [
     "dist",

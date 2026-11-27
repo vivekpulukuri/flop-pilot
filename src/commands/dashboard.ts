@@ -8,7 +8,7 @@ import { openLedger } from '../ledger/ledger.js';
 import { createApp } from '../dashboard/server.js';
 import { isLoaded, launchdLabel } from '../autopilot/launchd.js';
 
-export async function serveDashboard(o: { home: string; env: Env; store: SecretStore; makeChain: (n: Network) => Promise<ChainPort>; open: boolean }): Promise<void> {
+export async function serveDashboard(o: { home: string; env: Env; store: SecretStore | undefined; makeChain: (n: Network) => Promise<ChainPort>; open: boolean }): Promise<void> {
   const c = loadConfig(o.home);
   const token = randomBytes(24).toString('base64url');
   const app = createApp({

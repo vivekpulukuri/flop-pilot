@@ -63,3 +63,18 @@ test('project inside Documents → install-location check fails with the move hi
   const ok = await runDoctor(base({ cliPath: `${homedir()}/flop-pilot/dist/cli.js` }));
   expect(byName(ok, 'Install location works with the autopilot').ok).toBe(true);
 });
+
+test('doctor names the password store and warns when it is the key file', async () => {
+  const cs = await runDoctor(base({ storeKind: { kind: 'key-file', weak: true } }));
+  expect(byName(cs, 'Password store')).toMatchObject({ ok: true, warn: true, detail: 'key file' });
+  expect(byName(cs, 'Password store').fix).toMatch(/anyone who can log in as you/i);
+  const ok = await runDoctor(base({ storeKind: { kind: 'keychain', weak: false } }));
+  expect(byName(ok, 'Password store')).toMatchObject({ ok: true, detail: 'macOS Keychain' });
+});
+
+test('doctor in passphrase mode does not try to unlock (it would prompt)', async () => {
+  const { updateConfig } = await import('../../src/core/config.js');
+  updateConfig(home, { unlock: 'passphrase' });
+  const cs = await runDoctor(base({ store: memSecretStore(null), storeKind: { kind: 'passphrase', weak: false } }));
+  expect(byName(cs, 'Vault unlocks')).toMatchObject({ ok: true, detail: expect.stringMatching(/passphrase/) });
+});
