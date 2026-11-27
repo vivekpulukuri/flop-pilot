@@ -16,6 +16,9 @@ import { createSdkChain, isSupportedSpec } from './chain/sdk-chain.js';
 import { NETWORK_PROFILES } from './core/networks.js';
 import { runDoctor, formatChecks } from './commands/doctor.js';
 import { isLoaded } from './autopilot/launchd.js';
+import { createFaucet } from './faucet/sdk-faucet.js';
+import { runFund, formatResults } from './commands/fund.js';
+import type { RuntimeDeps } from './runtime.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
 export const VERSION = pkg.version;
@@ -24,6 +27,12 @@ const keychain = (home: string) => macKeychain(undefined, keychainAccount(home))
 function requireSetup(home: string): void {
   if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: flop-pilot init');
 }
+
+const deps = (): RuntimeDeps => ({
+  home: pilotHome(), env: realEnv({ version: VERSION }), store: keychain(pilotHome()),
+  makeChain: (n) => createSdkChain(n), makeFaucet: (n, env) => createFaucet(n, env),
+});
+const walletOpt = (v: string) => { const n = Number(v); if (!Number.isInteger(n) || n < 0 || n > 2) throw new Error('--wallet must be 0, 1 or 2'); return n; };
 
 const program = new Command();
 program.name('flop-pilot').description('Autopilot for FLOP Testnet agents').version(VERSION);
@@ -86,6 +95,14 @@ program.command('doctor')
     });
     console.log(formatChecks(checks));
     if (checks.some((x) => !x.ok)) process.exitCode = 1;
+  });
+
+program.command('fund')
+  .description('Claim the faucet grant for each claiming wallet (guarded)')
+  .option('--wallet <n>', 'only this wallet (0-2)', walletOpt)
+  .option('--dry-run', 'show what would happen without sending anything')
+  .action(async (o: { wallet?: number; dryRun?: boolean }) => {
+    console.log(formatResults(await runFund(deps(), o)));
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
