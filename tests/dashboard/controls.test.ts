@@ -102,3 +102,28 @@ test('claim-status explains each wallet and the controls page renders', async ()
   expect(page).toMatch(/Claim now/);
   expect(page).toMatch(/Type STOP/);
 });
+
+test('I5: Claim now is refused while paused or while the autopilot holds the lock (no faucet POST)', async () => {
+  const { acquireLock, releaseLock } = await import('../../src/autopilot/lock.js');
+  updateConfig(home, { paused: true });
+  const r1 = await post('/api/claim/1');
+  expect(r1.status).toBe(409);
+  expect(((await r1.json()) as { message: string }).message).toMatch(/Resume first/);
+  updateConfig(home, { paused: false });
+  acquireLock(paths(home).lock);
+  const r2 = await post('/api/claim/1');
+  expect(r2.status).toBe(409);
+  expect(((await r2.json()) as { message: string }).message).toMatch(/running right now/);
+  releaseLock(paths(home).lock);
+  expect(callsOf(faucet, 'claim')).toHaveLength(0);
+});
+
+test('I8: dashboard Resume also clears stopped wallets', async () => {
+  const l = openLedger(paths(home).ledger);
+  l.setWalletFlags('testnet', 2, { stopped: true });
+  l.close();
+  await post('/api/resume');
+  const l2 = openLedger(paths(home).ledger);
+  expect(l2.listWallets('testnet')[2].stopped).toBe(false);
+  l2.close();
+});

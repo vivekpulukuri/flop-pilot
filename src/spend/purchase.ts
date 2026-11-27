@@ -11,6 +11,7 @@ import { planSessions } from './budget.js';
 import { completeTask, nextTask, scoreOutput, type Task } from './tasks.js';
 
 const DAY = 86400_000;
+const HOUR = 3600_000;
 interface IntentFile { intent: InferenceIntent; wallet: number; miner: string; minerUrl: string; escrow: string; task: Task; }
 
 const isUnconfirmed = (e: unknown) => {
@@ -55,12 +56,16 @@ export async function purchaseOne(ctx: Ctx, w: Wallet, miner: MinerInfo & { url:
   } catch (e) {
     return { wallet: w.index, action: 'spend', kind: 'failed', reason: 'prepare_failed', detail: `wallet #${w.index}: could not prepare a session with ${miner.address} (${(e as Error).message})` };
   }
+  if (intent.miner !== miner.address) {
+    await alert(ctx, 'miner_mismatch', `The endpoint ${miner.url} belongs to miner ${intent.miner ?? 'unknown'}, not ${miner.address}. Nothing was bought; fix this miner on the Controls page.`, `mismatch:${miner.address}:${intent.miner}`);
+    return { wallet: w.index, action: 'spend', kind: 'failed', reason: 'miner_mismatch', detail: `wallet #${w.index}: endpoint ${miner.url} is not miner ${miner.address}; nothing bought` };
+  }
   const f: IntentFile = { intent, wallet: w.index, miner: miner.address, minerUrl: miner.url, escrow: escrow.toString(), task };
   // Persist the secret intent before buying; never prepare twice for one purchase.
   writeFileSync(intentPath(ctx, intent.id), JSON.stringify(f), { mode: 0o600, flag: 'wx' });
   const id = ctx.ledger.insertSpend({
     network: ctx.network, wallet_idx: w.index, intent_id: intent.id, miner: miner.address, miner_url: miner.url,
-    independence: 'independent', escrow: escrow.toString(), status: 'prepared', task_id: task.id,
+    independence: 'independent', escrow: escrow.toString(), status: 'prepared', task_id: task.id, channel_id: intent.channelId ?? null,
     public_ip: await ctx.env.publicIp(), mode: ctx.mode ?? 'standby', ts: ctx.env.now().toISOString(),
   });
   const row = ctx.ledger.spendsByStatus(ctx.network, ['prepared']).find((s) => s.id === id)!;
@@ -130,6 +135,15 @@ export async function resumeSpends(ctx: Ctx, wallets: Wallet[], chain: ChainPort
     if (s === 'settled' || s === 'refunded') {
       ctx.ledger.updateSpend(row.id, { status: s });
       rmSync(intentPath(ctx, row.intent_id), { force: true });
+      continue;
+    }
+    // A miner that never settles would block the wallet forever: finalize or time out (permissionless), at most hourly.
+    const now = ctx.env.now().getTime();
+    const w = byIdx.get(row.wallet_idx);
+    const lastTry = ctx.ledger.getState<string>(`recover:${row.intent_id}`);
+    if (w && now - new Date(row.ts).getTime() > 2 * HOUR && (!lastTry || now - new Date(lastTry).getTime() > HOUR)) {
+      ctx.ledger.setState(`recover:${row.intent_id}`, ctx.env.now().toISOString());
+      try { await chain.recoverChannel(w.pair, row.channel_id); } catch { /* not possible yet; retried next hour */ }
     }
   }
   return out;

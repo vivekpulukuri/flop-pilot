@@ -42,9 +42,15 @@ export function lastFundedClaim(ctx: Ctx, idx: number): ClaimRow | null {
 /** Devnet findings Q3: a finalized paid compute channel after the last grant unlocks the next one. */
 export function lastGrantSpent(ctx: Ctx, idx: number): boolean {
   const last = lastFundedClaim(ctx, idx);
-  if (!last) return true;
-  return ctx.ledger.spendsSince(ctx.network, new Date(last.ts), idx).some((s) => s.status === 'settled');
+  // After an agent_spend_missing refusal, only a settled spend newer than that refusal unlocks the next claim.
+  const required = ctx.ledger.getState<string>(`spendRequired:${ctx.network}:${idx}`);
+  const since = required && (!last || required > last.ts) ? required : last?.ts;
+  if (!since) return true;
+  return ctx.ledger.spendsSince(ctx.network, new Date(since), idx).some((s) => s.status === 'settled' && s.ts > since);
 }
+
+/** The SDK refused before sending anything (e.g. its own /chain pre-check failed): no reason, action or HTTP status. */
+export const isPreCheckRefusal = (r: ClaimResult) => r.outcome === 'refused' && r.httpStatus === undefined && !r.reason && !r.action;
 
 function claimsIn24h(ctx: Ctx): number {
   return ctx.ledger.claimsSince(ctx.network, new Date(ctx.env.now().getTime() - DAY)).filter((c) => COUNTED.has(c.status)).length;
@@ -72,6 +78,7 @@ export function claimGuard(ctx: Ctx, idx: number, limits: FaucetLimits) {
     backoffUntil: backoff ? new Date(backoff.until) : null,
     sharedIpPauseUntil: shared ? new Date(shared) : null,
     claimsStopped: !!ctx.ledger.getState<boolean>(k.stopped),
+    spendRequiredSince: (() => { const r = ctx.ledger.getState<string>(`spendRequired:${ctx.network}:${idx}`); return r ? new Date(r) : null; })(),
     limits,
   });
 }
@@ -85,6 +92,8 @@ async function applyOutcome(ctx: Ctx, id: number, idx: number, r: ClaimResult): 
 
   switch (r.outcome) {
     case 'accepted': {
+      ctx.ledger.setState(`refusals:${ctx.network}:${idx}`, null);
+      ctx.ledger.setState(`spendRequired:${ctx.network}:${idx}`, null);
       ctx.ledger.updateClaim(id, {
         ...common, status: r.transferStatus === 'finalized' ? 'finalized' : 'accepted', tx_hash: r.txHash ?? null,
         transfer_status: r.transferStatus ?? null, ...(r.amountFlop ? { amount: toPlanck(r.amountFlop).toString() } : {}),
@@ -105,6 +114,7 @@ async function applyOutcome(ctx: Ctx, id: number, idx: number, r: ClaimResult): 
       ctx.ledger.updateClaim(id, { ...common, status: 'refused' });
       const reason = r.reason ?? '';
       if (reason === 'agent_spend_missing') {
+        ctx.ledger.setState(`spendRequired:${ctx.network}:${idx}`, now.toISOString());
         setBackoff((r.retryAfterSeconds ?? 3600) * 1000);
         return { ...base, kind: 'skipped', reason: 'rollover_unspent', detail: `wallet #${idx}: ${SKIP_TEXT.rollover_unspent}` };
       }
@@ -123,8 +133,20 @@ async function applyOutcome(ctx: Ctx, id: number, idx: number, r: ClaimResult): 
         await alert(ctx, 'faucet_report', `All claims stopped: the faucet said "${r.error ?? reason}" (${reason}). Report this to the FLOP team.`, `faucet_report:${ctx.network}`);
         return { ...base, kind: 'failed', reason: 'claims_stopped', detail: `faucet asked to report (${reason}); all claims stopped` };
       }
-      setBackoff((r.retryAfterSeconds ?? 3600) * 1000);
-      return { ...base, kind: 'skipped', reason: 'backoff', detail: `wallet #${idx}: faucet refused (${reason || 'no reason'}); retrying later` };
+      if (r.action === 'retry_later') {
+        setBackoff((r.retryAfterSeconds ?? 3600) * 1000);
+        return { ...base, kind: 'skipped', reason: 'backoff', detail: `wallet #${idx}: faucet asked to wait (${reason || 'no reason'}); retrying later` };
+      }
+      // No action given: back off 1 h, then 6 h; the third such refusal stops the wallet (never a retry loop).
+      const n = (ctx.ledger.getState<number>(`refusals:${ctx.network}:${idx}`) ?? 0) + 1;
+      ctx.ledger.setState(`refusals:${ctx.network}:${idx}`, n);
+      if (n >= 3) {
+        ctx.ledger.setWalletFlags(ctx.network, idx, { stopped: true });
+        await alert(ctx, 'faucet_fix', `Wallet #${idx} stopped claiming after 3 refusals from the faucet (${reason || r.error || 'no reason given'}). Check FLOP's status, then use Resume.`, `faucet_fix:${ctx.network}:${idx}:repeat`);
+        return { ...base, kind: 'failed', reason: 'wallet_stopped', detail: `wallet #${idx}: refused 3 times; wallet stopped` };
+      }
+      setBackoff(n === 1 ? HOUR : 6 * HOUR);
+      return { ...base, kind: 'skipped', reason: 'backoff', detail: `wallet #${idx}: faucet refused (${reason || 'no reason'}); retrying in ${n === 1 ? 1 : 6} h` };
     }
   }
 }
@@ -152,6 +174,8 @@ export async function claimWallet(ctx: Ctx, w: Wallet, ports: { faucet: FaucetPo
   } catch (e) {
     result = { outcome: 'unknown', nonce, error: (e as Error).message };
   }
+  // Nothing was sent: treat like a temporary outage (no refusal counting, no new state).
+  if (isPreCheckRefusal(result)) result = { ...result, outcome: 'unavailable' };
   return applyOutcome(ctx, id, w.index, result);
 }
 
@@ -174,6 +198,7 @@ export async function reconcileClaims(ctx: Ctx, ports: { faucet: FaucetPort; cha
     } catch (e) {
       r = { outcome: 'unknown', nonce: row.nonce, error: (e as Error).message };
     }
+    if (isPreCheckRefusal(r)) { ctx.ledger.updateClaim(row.id, { error: r.error ?? 'pre-check failed' }); continue; }
     out.push(await applyOutcome(ctx, row.id, row.wallet_idx, r));
   }
   for (const row of ctx.ledger.claimsByStatus(ctx.network, ['accepted'])) {

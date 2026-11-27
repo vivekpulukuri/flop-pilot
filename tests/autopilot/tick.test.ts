@@ -30,7 +30,7 @@ beforeEach(async () => {
   env = fakeEnv(new Date('2026-11-27T12:00:00Z'));
   pageFetches = 0;
   env.fetch = (async () => { pageFetches++; return new Response('<p>page</p>'); }) as typeof fetch;
-  chain = fakeChain({ registered: [{ address: MINER, models: ['0xm'] }] });
+  chain = fakeChain({ registered: [{ address: MINER, models: ['0xm'] }], urlMiners: { 'https://miner.example': MINER } });
   faucet = fakeFaucet();
 });
 

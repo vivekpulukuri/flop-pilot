@@ -43,7 +43,7 @@ export function fakeFaucet(opts: { limits?: FaucetLimits; result?: Partial<Claim
   return f;
 }
 
-export function fakeChain(init: Partial<{ spec: number; head: number; balances: Record<string, bigint>; wallets: Record<string, AgentWalletInfo>; linked: Record<string, string[] | null>; registered: { address: string; models: string[] }[] }> = {}) {
+export function fakeChain(init: Partial<{ spec: number; head: number; balances: Record<string, bigint>; wallets: Record<string, AgentWalletInfo>; linked: Record<string, string[] | null>; registered: { address: string; models: string[] }[]; urlMiners: Record<string, string> }> = {}) {
   const calls: Call[] = [];
   const balances: Record<string, bigint> = { ...(init.balances ?? {}) };
   const wallets: Record<string, AgentWalletInfo> = { ...(init.wallets ?? {}) };
@@ -61,7 +61,13 @@ export function fakeChain(init: Partial<{ spec: number; head: number; balances: 
     async getAgentWallet(a) { calls.push({ fn: 'getAgentWallet', args: [a] }); return wallets[a] ?? null; },
     async createAgentWallet(pair, p) { calls.push({ fn: 'createAgentWallet', args: [pair.address, p] }); wallets[pair.address] = { ...p, active: true }; return '0xenroll' + (++n); },
     async deactivateWallet(pair) { calls.push({ fn: 'deactivateWallet', args: [pair.address] }); if (wallets[pair.address]) wallets[pair.address].active = false; return '0xdeact' + (++n); },
-    async prepareInference(pair, p) { calls.push({ fn: 'prepareInference', args: [pair.address, p] }); if (c.throwOn.prepareInference) throw c.throwOn.prepareInference; return { id: 'intent' + (++n), secret: 's3cr3t', ...p } as InferenceIntent; },
+    async prepareInference(pair, p) {
+      calls.push({ fn: 'prepareInference', args: [pair.address, p] });
+      if (c.throwOn.prepareInference) throw c.throwOn.prepareInference;
+      const id = 'intent' + (++n);
+      return { id, secret: 's3cr3t', miner: (init.urlMiners ?? {})[p.minerUrl] ?? '5MinerIndependent', channelId: '0xchan' + id, ...p } as InferenceIntent;
+    },
+    async recoverChannel(pair, id) { calls.push({ fn: 'recoverChannel', args: [pair.address, id] }); return '0xrecover'; },
     async buyInference(pair, p) {
       calls.push({ fn: 'buyInference', args: [pair.address, p.intent.id, p.prompt] });
       if (c.throwOn.buyInference) { const e = c.throwOn.buyInference; delete c.throwOn.buyInference; throw e; }

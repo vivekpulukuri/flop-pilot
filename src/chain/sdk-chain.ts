@@ -72,7 +72,8 @@ export async function createSdkChain(n: Network, o: { timeoutMs?: number } = {})
     async prepareInference(pair, p) {
       const client = await clientFor(pair);
       const sdkIntent = await client.prepareInferenceSession({ minerUrl: p.minerUrl, escrowFlop: p.escrowFlop, maxTurns: 1 });
-      return { id: randomUUID(), sdk: sdkIntent } as InferenceIntent;
+      const si = sdkIntent as unknown as { channelId?: string; params?: { miner?: string } };
+      return { id: randomUUID(), sdk: sdkIntent, miner: si.params?.miner ? String(si.params.miner) : undefined, channelId: si.channelId ? String(si.channelId) : undefined } as InferenceIntent;
     },
     async buyInference(pair, p) {
       const client = await clientFor(pair);
@@ -82,6 +83,17 @@ export async function createSdkChain(n: Network, o: { timeoutMs?: number } = {})
     async channelStatus(channelId) {
       const v = (await api.query.computeChannel.channels(channelId)).toJSON() as { state?: unknown } | null;
       return v ? mapChannelState(v.state) : 'unknown';
+    },
+    async recoverChannel(pair, channelId) {
+      const state = mapChannelState(((await api.query.computeChannel.channels(channelId)).toJSON() as { state?: unknown } | null)?.state);
+      const call = state === 'settlement_posted' ? api.tx.computeChannel.finalize(channelId) : state === 'open' ? api.tx.computeChannel.timeout(channelId) : null;
+      if (!call) return null;
+      return new Promise<string | null>((resolve) => {
+        call.signAndSend(pair as never, ({ status, dispatchError }) => {
+          if (dispatchError) resolve(null);
+          else if (status.isInBlock) resolve(call.hash.toHex());
+        }).catch(() => resolve(null));
+      });
     },
     async minerLinkedAccounts(miner) {
       try {

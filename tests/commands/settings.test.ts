@@ -61,3 +61,26 @@ test('addMinerEndpoint validates SS58 and https URL; removeMinerEndpoint removes
   removeMinerEndpoint(home, addr);
   expect(loadConfig(home).minerEndpoints).toEqual([]);
 });
+
+test('I5: fund (real) is refused while paused; dry-run still simulates', async () => {
+  const { runFund } = await import('../../src/commands/fund.js');
+  const { fakeChain, fakeEnv, fakeFaucet } = await import('../fakes.js');
+  const { updateConfig } = await import('../../src/core/config.js');
+  const deps = { home, env: fakeEnv(), store, makeChain: async () => fakeChain(), makeFaucet: () => fakeFaucet() };
+  updateConfig(home, { practice: false, paused: true });
+  await expect(runFund(deps, {})).rejects.toThrow(/Resume first/);
+  const sim = await runFund(deps, { dryRun: true });
+  expect(sim.every((r) => r.kind === 'simulated' || r.kind === 'skipped')).toBe(true);
+});
+
+test('I5: a real CLI action holds the tick lock while it runs and releases it after', async () => {
+  const { openRuntime } = await import('../../src/runtime.js');
+  const { acquireLock } = await import('../../src/autopilot/lock.js');
+  const { fakeChain, fakeEnv, fakeFaucet } = await import('../fakes.js');
+  const { updateConfig } = await import('../../src/core/config.js');
+  updateConfig(home, { practice: false, paused: false });
+  const rt = await openRuntime({ home, env: fakeEnv(), store, makeChain: async () => fakeChain(), makeFaucet: () => fakeFaucet() });
+  expect(acquireLock(paths(home).lock)).toBe(false);
+  await rt.close();
+  expect(acquireLock(paths(home).lock)).toBe(true);
+});

@@ -4,7 +4,7 @@ import { NETWORK_PROFILES } from '../core/networks.js';
 
 interface SdkResult {
   success?: boolean; outcome?: string; txHash?: string; reason?: string; error?: string; action?: string;
-  retryAfterSeconds?: number; transferStatus?: 'included' | 'finalized'; amount?: number;
+  retryAfterSeconds?: number; transferStatus?: 'included' | 'finalized'; amount?: number; status?: number;
 }
 export interface FaucetSdk {
   claimTestnetAgentFunds: (address: string, c: { nonce?: string; sign: (m: Uint8Array) => Promise<string> }) => Promise<SdkResult>;
@@ -41,7 +41,7 @@ function mapResult(r: SdkResult, nonce: string): ClaimResult {
   const action = (['retry_later', 'fix_request', 'report_to_operator'] as const).find((a) => a === r.action) as RefusalAction | undefined;
   return {
     outcome, nonce, txHash: r.txHash, reason: r.reason, error: r.error, action,
-    retryAfterSeconds: r.retryAfterSeconds, transferStatus: r.transferStatus, amountFlop: r.amount,
+    retryAfterSeconds: r.retryAfterSeconds, transferStatus: r.transferStatus, amountFlop: r.amount, httpStatus: r.status,
   };
 }
 

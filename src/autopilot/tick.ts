@@ -40,10 +40,15 @@ export async function runTick(d: RuntimeDeps): Promise<TickSummary> {
     const step = async (name: string, f: () => Promise<void>) => { try { await f(); } catch (e) { s.errors.push(`${name}: ${msg(e)}`); } };
 
     let wallets: Wallet[];
+    // A locked Keychain may show a macOS dialog; ask at most every 6 h instead of every tick.
+    const lockedAt = c.ledger.getState<string>('vaultLockedAt');
+    if (lockedAt && c.env.now().getTime() - new Date(lockedAt).getTime() < 6 * 3600_000) { s.skippedAll = 'vault_locked'; return s; }
     try {
       wallets = await loadWallets(c, d.store);
+      if (lockedAt) { c.ledger.setState('vaultLockedAt', null); for (const a of c.ledger.listAlerts(true)) if (a.kind === 'vault_locked') c.ledger.ackAlert(a.id); }
     } catch (e) {
       if (e instanceof VaultLockedError) {
+        c.ledger.setState('vaultLockedAt', c.env.now().toISOString());
         await alert(c, 'vault_locked', 'The autopilot could not unlock your wallets: the macOS Keychain is locked or denied access. Log in to your Mac and allow access, then it resumes by itself.', 'vault_locked');
         s.skippedAll = 'vault_locked';
         return s;

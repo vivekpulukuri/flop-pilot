@@ -51,6 +51,8 @@ export interface ClaimResult {
   retryAfterSeconds?: number;
   transferStatus?: 'included' | 'finalized';
   amountFlop?: number;
+  /** HTTP status when the faucet answered; absent when the SDK refused before sending anything. */
+  httpStatus?: number;
 }
 
 export interface FaucetPort {
@@ -62,7 +64,7 @@ export interface FaucetPort {
 export interface AgentWalletInfo { perTxLimit: bigint; dailyCap: bigint; active: boolean; }
 export type ChannelStatus = 'open' | 'settlement_posted' | 'settled' | 'refunded' | 'unknown';
 /** Opaque SDK purchase intent. Contains a session secret: persist with mode 0600, never log. */
-export interface InferenceIntent { id: string; [k: string]: unknown }
+export interface InferenceIntent { id: string; /** Miner the endpoint proved it is (the one that gets paid). */ miner?: string; channelId?: string; [k: string]: unknown }
 export interface BuyResult { status: 'settlement_posted'; output: string; channelId: string; gnUsed: bigint; }
 
 export interface ChainPort {
@@ -76,6 +78,8 @@ export interface ChainPort {
   prepareInference(pair: KeyringPair, p: { minerUrl: string; escrowFlop: number }): Promise<InferenceIntent>;
   buyInference(pair: KeyringPair, p: { intent: InferenceIntent; prompt: string }): Promise<BuyResult>;
   channelStatus(channelId: string): Promise<ChannelStatus>;
+  /** Permissionless recovery: finalize a posted settlement or time out a stale open channel. Null if not possible yet. */
+  recoverChannel(pair: KeyringPair, channelId: string): Promise<string | null>;
   /** Accounts that delegate or sponsor stake to a miner; null when it cannot be determined. */
   minerLinkedAccounts(miner: string): Promise<string[] | null>;
   /** Registered miner addresses with their model hashes. */

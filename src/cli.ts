@@ -23,7 +23,7 @@ import { runEnroll } from './commands/enroll.js';
 import { runSpend } from './commands/spend.js';
 import { setActivationBlock } from './watchers/mode.js';
 import { runTick } from './autopilot/tick.js';
-import { autopilotOn, autopilotOff, autopilotStatus, stopAll } from './commands/autopilot.js';
+import { autopilotOn, autopilotOff, autopilotStatus, stopAll, resumeAll } from './commands/autopilot.js';
 import { updateConfig } from './core/config.js';
 import { serveDashboard } from './commands/dashboard.js';
 import { runUpdate } from './commands/update.js';
@@ -173,7 +173,7 @@ ap.command('status').action(async () => {
 });
 
 program.command('pause').description('Pause claims and spends (watchers keep running)').action(() => { requireSetup(pilotHome()); updateConfig(pilotHome(), { paused: true }); console.log('Paused. Resume with: flop-pilot resume'); });
-program.command('resume').description('Resume after pause').action(() => { requireSetup(pilotHome()); updateConfig(pilotHome(), { paused: false }); console.log('Resumed.'); });
+program.command('resume').description('Resume after a pause, kill switch or faucet stop').action(() => { requireSetup(pilotHome()); resumeAll(pilotHome()); console.log('Resumed. Stopped wallets will try again on the next run.'); });
 
 program.command('stop')
   .description('Kill switch: stop the autopilot now')

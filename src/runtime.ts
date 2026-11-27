@@ -7,6 +7,7 @@ import { openLedger } from './ledger/ledger.js';
 import { unlockSeed } from './keys/vault.js';
 import { deriveWallets, type Wallet } from './keys/derive.js';
 import { WALLET_COUNT } from './commands/init.js';
+import { acquireLock, releaseLock } from './autopilot/lock.js';
 
 export interface RuntimeDeps {
   home: string;
@@ -35,9 +36,19 @@ export async function loadWallets(ctx: Ctx, store: SecretStore): Promise<Wallet[
   return ws;
 }
 
-/** Connects everything a command needs; always call close(). */
-export async function openRuntime(d: RuntimeDeps, o: { practice?: boolean } = {}) {
+/** Connects everything a command needs; always call close(). Real (non-practice) runs pass the action gate. */
+export async function openRuntime(d: RuntimeDeps, o: { practice?: boolean; skipGate?: boolean } = {}) {
   const ctx = openCtx(d.home, d.env, o);
+  let locked = false;
+  if (!ctx.config.practice && !o.skipGate) {
+    const { actionGate } = await import('./commands/autopilot.js');
+    const blocked = actionGate(ctx);
+    if (blocked) { ctx.ledger.close(); throw new Error(blocked); }
+    // Hold the tick lock for the whole command so it never races the autopilot.
+    if (!acquireLock(paths(d.home).lock)) { ctx.ledger.close(); throw new Error('The autopilot is running right now. Try again in a minute.'); }
+    locked = true;
+  }
+  const unlock = () => { if (locked) releaseLock(paths(d.home).lock); };
   let chain: ChainPort | null = null;
   try {
     const wallets = await loadWallets(ctx, d.store);
@@ -46,11 +57,12 @@ export async function openRuntime(d: RuntimeDeps, o: { practice?: boolean } = {}
     const c = chain;
     return {
       ctx, wallets, chain: c, faucet,
-      async close() { await c.disconnect().catch(() => {}); ctx.ledger.close(); },
+      async close() { await c.disconnect().catch(() => {}); ctx.ledger.close(); unlock(); },
     };
   } catch (e) {
     if (chain) await chain.disconnect().catch(() => {});
     ctx.ledger.close();
+    unlock();
     throw e;
   }
 }

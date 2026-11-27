@@ -12,7 +12,7 @@ import { createFaucet } from '../../faucet/sdk-faucet.js';
 import { spendWallet } from '../../spend/purchase.js';
 import { createMinerDirectory } from '../../spend/miners.js';
 import { setActivationBlock } from '../../watchers/mode.js';
-import { stopAll } from '../../commands/autopilot.js';
+import { stopAll, resumeAll, actionGate, withActionLock } from '../../commands/autopilot.js';
 import { addMinerEndpoint, isSs58, removeMinerEndpoint } from '../../commands/settings.js';
 import { runExport } from '../../commands/export.js';
 
@@ -40,13 +40,18 @@ export function controlRoutes(deps: DashboardDeps, chain: () => Promise<ChainPor
     if (!ch) return bad(c, 'Could not reach the FLOP chain. Check your internet connection.');
     const ctx = openCtx(deps.home, deps.env);
     try {
+      if (!ctx.config.practice) {
+        const blocked = actionGate(ctx, { checkLock: true });
+        if (blocked) return c.json({ ok: false, message: blocked }, 409);
+      }
       const w = (await loadWallets(ctx, deps.store)).find((x) => x.index === idx);
       if (!w) return bad(c, `There is no wallet #${idx}.`);
+      const run = <T>(f: () => Promise<T>) => (ctx.config.practice ? f() : withActionLock(ctx, f));
       if (kind === 'claim') {
-        const result = await claimWallet(ctx, w, { faucet: faucetOf(ctx.network), chain: ch });
+        const result = await run(() => claimWallet(ctx, w, { faucet: faucetOf(ctx.network), chain: ch }));
         return ok(c, result.detail, { result });
       }
-      const results = await spendWallet(ctx, w, { chain: ch, miners: createMinerDirectory(ch, ctx.config.minerEndpoints) });
+      const results = await run(() => spendWallet(ctx, w, { chain: ch, miners: createMinerDirectory(ch, ctx.config.minerEndpoints) }));
       return ok(c, results.map((r) => r.detail).join(' · '), { result: results });
     } finally {
       ctx.ledger.close();
@@ -56,7 +61,7 @@ export function controlRoutes(deps: DashboardDeps, chain: () => Promise<ChainPor
   api.post('/claim/:index', (c) => walletAction(c, 'claim'));
   api.post('/spend/:index', (c) => walletAction(c, 'spend'));
   api.post('/pause', (c) => { updateConfig(deps.home, { paused: true }); return ok(c, 'Paused. Claims and purchases wait until you resume.'); });
-  api.post('/resume', (c) => { updateConfig(deps.home, { paused: false }); return ok(c, 'Resumed.'); });
+  api.post('/resume', (c) => { resumeAll(deps.home); return ok(c, 'Resumed. Stopped wallets will try again on the next run.'); });
   api.post('/practice', async (c) => {
     const on = (await body(c)).on === 'true';
     updateConfig(deps.home, { practice: on });

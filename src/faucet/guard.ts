@@ -13,6 +13,8 @@ export interface ClaimGuardInput {
   backoffUntil: Date | null;
   sharedIpPauseUntil: Date | null;
   claimsStopped: boolean;
+  /** Set after an agent_spend_missing refusal: the faucet wants a new settled spend first. */
+  spendRequiredSince?: Date | null;
   limits: FaucetLimits;
 }
 
@@ -37,6 +39,7 @@ export function decideClaim(i: ClaimGuardInput): ClaimDecision {
     if (until > t) return { ok: false, reason: 'cooldown', until: new Date(until) };
     if (i.limits.rolloverRequiresSpend && !i.lastGrantSpent) return { ok: false, reason: 'rollover_unspent' };
   }
+  if (i.spendRequiredSince && !i.lastGrantSpent) return { ok: false, reason: 'rollover_unspent' };
   if (i.limits.status !== 'open') return { ok: false, reason: 'faucet_closed' };
   if (i.limits.remainingFlop < i.limits.grantFlop) return { ok: false, reason: 'pool_empty' };
   return { ok: true };
