@@ -18,6 +18,7 @@ import { runDoctor, formatChecks } from './commands/doctor.js';
 import { isLoaded } from './autopilot/launchd.js';
 import { createFaucet } from './faucet/sdk-faucet.js';
 import { runFund, formatResults } from './commands/fund.js';
+import { runEnroll } from './commands/enroll.js';
 import type { RuntimeDeps } from './runtime.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -103,6 +104,13 @@ program.command('fund')
   .option('--dry-run', 'show what would happen without sending anything')
   .action(async (o: { wallet?: number; dryRun?: boolean }) => {
     console.log(formatResults(await runFund(deps(), o)));
+  });
+
+program.command('enroll')
+  .description('Register each funded wallet as an on-chain agent wallet with spending caps')
+  .option('--dry-run', 'show what would happen without sending anything')
+  .action(async (o: { dryRun?: boolean }) => {
+    console.log(formatResults(await runEnroll(deps(), o)));
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
