@@ -19,25 +19,28 @@ on a dashboard that only your Mac can open.
 
 ## Commands
 
+Run these from the `flop-pilot` folder. Commands that take extra words need `--` before them.
+
 | Command | What it does |
 |---|---|
-| `init [--restore] [--network devnet\|testnet]` | Create (or restore) your seed phrase, vault and 3 wallets |
-| `doctor` | Check setup, chain, faucet and install location |
-| `wallets` | List addresses and status |
-| `fund [--wallet N] [--dry-run]` | Claim the faucet grant (guarded) |
-| `enroll [--dry-run]` | Register funded wallets as agent wallets with spending caps |
-| `spend [--wallet N] [--dry-run]` | Buy inference from independent miners |
-| `miners add\|list\|remove` | Manage the miner endpoints you buy from |
-| `autopilot on\|off\|status` | Background job, every 15 minutes |
-| `tick` | Run one autopilot cycle now |
-| `pause` / `resume` / `stop [--deactivate]` | Pause, resume, kill switch |
-| `practice on\|off` | Practice mode |
-| `network devnet\|testnet` | Switch the active network |
-| `claimers 1\|2\|3` | How many wallets claim (split with others on your connection) |
-| `activation <block>\|clear` | Enter the announced block where earning starts |
-| `dashboard [--no-open]` | Open the local dashboard |
-| `update` | Update to the newest release tag (run it when FLOP upgrades) |
-| `export [--json] [--with-ip]` | Save claims and purchases to a file (IP left out by default) |
+| `npm run init` / `npm run init:restore` | Create (or restore) your seed phrase, vault and 3 wallets (starts on devnet) |
+| `npm run doctor` | Check setup, chain, faucet and install location |
+| `npm run wallets` | List addresses and status |
+| `npm run fund` | Claim the faucet grant (guarded); add `-- --wallet 1` or `-- --dry-run` |
+| `npm run enroll` | Register funded wallets as agent wallets with spending caps |
+| `npm run spend` | Buy inference from independent miners |
+| `npm run miners:list` / `npm run miners:add -- <address> <url>` / `npm run miners:remove -- <address>` | Miner endpoints you buy from |
+| `npm run autopilot:on` / `npm run autopilot:off` / `npm run autopilot:status` | Background job, every 15 minutes |
+| `npm run tick` | Run one autopilot cycle now |
+| `npm run pause` / `npm run resume` / `npm run stop` / `npm run stop:deactivate` | Pause, resume, kill switch |
+| `npm run practice:on` / `npm run practice:off` | Practice mode |
+| `npm run network:devnet` / `npm run network:testnet` | Switch the active network |
+| `npm run claimers:1` / `npm run claimers:2` / `npm run claimers:3` | How many wallets claim (split with others on your connection) |
+| `npm run activation -- <block>` | Enter the announced block where earning starts (`-- clear` to remove) |
+| `npm run dashboard` | Open the local dashboard |
+| `npm run update` | Update to the newest release tag (run it when FLOP upgrades) |
+| `npm run export` | Save claims and purchases to a file (IP left out; `-- --with-ip` to include) |
+| `npm run pilot -- <anything>` | Run the underlying CLI directly |
 
 ## Where things live
 

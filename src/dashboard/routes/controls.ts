@@ -70,7 +70,7 @@ export function controlRoutes(deps: DashboardDeps, chain: () => Promise<ChainPor
   api.post('/stop', async (c) => {
     if ((await body(c)).confirm?.trim() !== 'STOP') return bad(c, 'Type STOP in the box to confirm.');
     await stopAll(deps.home);
-    return ok(c, 'The autopilot is stopped. Turn it back on with: flop-pilot autopilot on');
+    return ok(c, 'The autopilot is stopped. Turn it back on with: npm run autopilot:on');
   });
   api.post('/settings', async (c) => {
     const b = await body(c);

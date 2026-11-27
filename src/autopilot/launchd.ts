@@ -37,7 +37,7 @@ export function protectedFolder(path: string): string | null {
 export function protectedFolderHint(name: string, projectDir: string): string {
   return `The flop-pilot folder is inside your ${name} folder. macOS blocks background jobs from reading ${name}, so the autopilot would hang. `
     + 'Please move the flop-pilot folder to your home folder, then turn the autopilot on again:\n'
-    + `  mv "${projectDir}" ~/flop-pilot && cd ~/flop-pilot && npm ci && node dist/cli.js autopilot on`;
+    + `  mv "${projectDir}" ~/flop-pilot && cd ~/flop-pilot && npm ci && npm run autopilot:on`;
 }
 
 export function plistPath(label: string, agentsDir = join(homedir(), 'Library', 'LaunchAgents')): string {

@@ -103,7 +103,7 @@ test('I4: the channel id is stored at prepare time; unconfirmed purchases are po
 test('I5: actionGate blocks real actions while killed, paused or runtime-blocked, and when a tick holds the lock', () => {
   expect(actionGate(ctx)).toBeNull();
   ctx.ledger.setState('runtimeBlocked:testnet', 1014099);
-  expect(actionGate(ctx)).toMatch(/flop-pilot update/);
+  expect(actionGate(ctx)).toMatch(/npm run update/);
   ctx.ledger.setState('runtimeBlocked:testnet', null);
   ctx.config.paused = true;
   expect(actionGate(ctx)).toMatch(/paused/i);

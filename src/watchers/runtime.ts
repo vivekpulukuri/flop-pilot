@@ -2,7 +2,7 @@ import type { ChainPort } from '../core/types.js';
 import { alert, type Ctx } from '../core/ctx.js';
 import { isSupportedSpec } from '../chain/sdk-chain.js';
 
-export const UNSUPPORTED_MSG = 'FLOP upgraded the chain. Run: flop-pilot update';
+export const UNSUPPORTED_MSG = 'FLOP upgraded the chain. Run: npm run update';
 
 /**
  * Compares the chain's runtime version with the last one seen. An unsupported version blocks the autopilot

@@ -54,7 +54,7 @@ export async function checkPage(ctx: Ctx, url: string, kind: 'activation' | 'rul
   ctx.ledger.insertSnapshot(url, hash, text, ctx.env.now().toISOString());
   ctx.ledger.setState(`watch:diff:${url}`, diff);
   const msg = kind === 'activation'
-    ? `FLOP's testnet timeline page changed. The earning start block may be announced: check ${url}, then enter the block on the dashboard or run: flop-pilot activation <block>`
+    ? `FLOP's testnet timeline page changed. The earning start block may be announced: check ${url}, then enter the block on the dashboard or run: npm run activation -- <block>`
     : `FLOP's program rules page changed (${url}). Review the changes on the Rules & alerts page.`;
   await alert(ctx, kind === 'activation' ? 'activation_page' : 'rules_changed', msg, `${url}#${hash}`);
   return { changed: true, diff };

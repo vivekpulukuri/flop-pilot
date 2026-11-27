@@ -32,7 +32,7 @@ test('all checks pass on a healthy setup', async () => {
 
 test('unsupported spec fails with the update fix', async () => {
   const cs = await runDoctor(base({ chain: async () => fakeChain({ spec: 1014099 }) }));
-  expect(byName(cs, 'Chain version supported')).toMatchObject({ ok: false, fix: 'Run: flop-pilot update' });
+  expect(byName(cs, 'Chain version supported')).toMatchObject({ ok: false, fix: 'Run: npm run update' });
 });
 
 test('faucet genesis mismatch fails with a stop message', async () => {

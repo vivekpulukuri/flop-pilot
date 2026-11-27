@@ -63,7 +63,7 @@ export async function runInit(o: { home: string; network: Network; restore: bool
       }
       if (!ok && attempt < MAX_ATTEMPTS) io.print("That didn't match your paper copy. Let's try again.");
     }
-    if (!ok) throw new Error('The words did not match after 3 tries. Setup cancelled; nothing was saved. Run `flop-pilot init` again.');
+    if (!ok) throw new Error('The words did not match after 3 tries. Setup cancelled; nothing was saved. Run `npm run init` again.');
   }
 
   ensureDirs(home);
@@ -82,5 +82,5 @@ export async function runInit(o: { home: string; network: Network; restore: bool
   } finally {
     ledger.close();
   }
-  io.print(`Set up done. Network: ${o.network}. Practice mode is ON (nothing is signed or sent). Next: flop-pilot doctor`);
+  io.print(`Set up done. Network: ${o.network}. Practice mode is ON (nothing is signed or sent). Next: npm run doctor`);
 }

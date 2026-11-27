@@ -23,7 +23,7 @@ const H = { host: `127.0.0.1:${PORT}` };
 test('no cookie → 401 with how-to-open text', async () => {
   const r = await app.request('/', { headers: H });
   expect(r.status).toBe(401);
-  expect(await r.text()).toContain('flop-pilot dashboard');
+  expect(await r.text()).toContain('npm run dashboard');
 });
 
 test('?t=wrong → 401; ?t=right → 302 with an HttpOnly SameSite=Strict cookie', async () => {

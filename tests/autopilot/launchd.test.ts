@@ -64,4 +64,5 @@ test('protectedFolderHint names the real project folder, not $PWD', async () => 
   expect(h).toContain('mv "/Users/a/Documents/flop-pilot" ~/flop-pilot');
   expect(h).not.toContain('$PWD');
   expect(h).not.toContain('npm link');
+  expect(h).toContain('npm run autopilot:on');
 });

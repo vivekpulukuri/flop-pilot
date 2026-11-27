@@ -24,11 +24,11 @@ export function localAuth(token: string, port: number): MiddlewareHandler {
     }
     const t = c.req.query('t');
     if (t !== undefined) {
-      if (!same(t, token)) return c.text('This dashboard link has expired. Open the dashboard again with: flop-pilot dashboard', 401);
+      if (!same(t, token)) return c.text('This dashboard link has expired. Open the dashboard again with: npm run dashboard', 401);
       setCookie(c, COOKIE, token, { httpOnly: true, sameSite: 'Strict', path: '/' });
       return c.redirect(new URL(c.req.url).pathname, 302);
     }
-    if (!same(getCookie(c, COOKIE), token)) return c.text('Open the dashboard with: flop-pilot dashboard', 401);
+    if (!same(getCookie(c, COOKIE), token)) return c.text('Open the dashboard with: npm run dashboard', 401);
     c.header('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'no-referrer');

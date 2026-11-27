@@ -13,7 +13,7 @@ document.querySelectorAll('form[data-post]').forEach(function (f) {
       var j = await r.json().catch(function () { return { message: r.statusText }; });
       out.textContent = ' ' + (j.message || (r.ok ? 'Done.' : 'Failed.'));
       if (r.ok && f.hasAttribute('data-reload')) setTimeout(function () { location.reload(); }, 900);
-    } catch (err) { out.textContent = ' Could not reach the dashboard server. Is flop-pilot dashboard still running?'; }
+    } catch (err) { out.textContent = ' Could not reach the dashboard server. Is npm run dashboard still running?'; }
     if (btn) btn.disabled = false;
   });
 });

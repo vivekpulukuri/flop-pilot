@@ -18,7 +18,7 @@ export interface RuntimeDeps {
 }
 
 export function openCtx(home: string, env: Env, o: { practice?: boolean } = {}): Ctx {
-  if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: flop-pilot init');
+  if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: npm run init');
   ensureDirs(home);
   const config = loadConfig(home);
   if (o.practice) config.practice = true;

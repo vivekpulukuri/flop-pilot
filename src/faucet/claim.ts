@@ -21,7 +21,7 @@ const keys = (ctx: Ctx, idx?: number) => ({
 });
 
 export const SKIP_TEXT: Record<SkipReason, string> = {
-  not_claimer: 'not a claiming wallet (see `flop-pilot claimers`)',
+  not_claimer: 'not a claiming wallet (see the Controls page, or npm run claimers:1 / :2 / :3)',
   wallet_stopped: 'wallet stopped after a faucet refusal; check alerts',
   claims_stopped: 'all claims stopped after a faucet report; check alerts',
   unresolved_pending: 'waiting to confirm an earlier claim',

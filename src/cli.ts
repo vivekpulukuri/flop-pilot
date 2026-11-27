@@ -40,7 +40,7 @@ export const VERSION = pkg.version;
 
 const keychain = (home: string) => macKeychain(undefined, keychainAccount(home));
 function requireSetup(home: string): void {
-  if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: flop-pilot init');
+  if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: npm run init');
 }
 
 const deps = (): RuntimeDeps => ({
@@ -74,7 +74,7 @@ program.command('wallets')
 program.command('practice <onoff>')
   .description('Practice mode on|off (on = nothing is signed or sent)')
   .action((v: string) => {
-    if (v !== 'on' && v !== 'off') throw new Error('Use: flop-pilot practice on   or   flop-pilot practice off');
+    if (v !== 'on' && v !== 'off') throw new Error('Use: npm run practice:on   or   npm run practice:off');
     requireSetup(pilotHome());
     setPractice(pilotHome(), v === 'on');
     console.log(`Practice mode is now ${v.toUpperCase()}.`);
@@ -139,7 +139,7 @@ const miners = program.command('miners').description('Miner endpoints you can bu
 miners.command('list').action(() => {
   requireSetup(pilotHome());
   const list = loadConfig(pilotHome()).minerEndpoints;
-  console.log(list.length ? list.map((e) => `${e.address}  ${e.url}`).join('\n') : 'No miner endpoints yet. Add one: flop-pilot miners add <address> <https-url>');
+  console.log(list.length ? list.map((e) => `${e.address}  ${e.url}`).join('\n') : 'No miner endpoints yet. Add one: npm run miners:add -- <address> <https-url>');
 });
 miners.command('add <address> <url>').action((a: string, u: string) => { requireSetup(pilotHome()); addMinerEndpoint(pilotHome(), a, u); console.log('Added.'); });
 miners.command('remove <address>').action((a: string) => { requireSetup(pilotHome()); removeMinerEndpoint(pilotHome(), a); console.log('Removed.'); });
@@ -172,7 +172,7 @@ ap.command('status').action(async () => {
   console.log(`Autopilot: ${st.loaded ? 'ON' : 'OFF'}${st.killed ? ' (stopped by kill switch)' : ''}${st.paused ? ' (paused)' : ''} · practice mode ${st.practice ? 'ON' : 'OFF'}`);
 });
 
-program.command('pause').description('Pause claims and spends (watchers keep running)').action(() => { requireSetup(pilotHome()); updateConfig(pilotHome(), { paused: true }); console.log('Paused. Resume with: flop-pilot resume'); });
+program.command('pause').description('Pause claims and spends (watchers keep running)').action(() => { requireSetup(pilotHome()); updateConfig(pilotHome(), { paused: true }); console.log('Paused. Resume with: npm run resume'); });
 program.command('resume').description('Resume after a pause, kill switch or faucet stop').action(() => { requireSetup(pilotHome()); resumeAll(pilotHome()); console.log('Resumed. Stopped wallets will try again on the next run.'); });
 
 program.command('stop')
@@ -183,7 +183,7 @@ program.command('stop')
     const io = await terminalIO();
     try {
       const rs = await stopAll(pilotHome(), { deactivate: o.deactivate, deps: deps(), confirm: () => io.ask('Type DEACTIVATE to confirm: ') });
-      console.log('Autopilot stopped. Start again with: flop-pilot autopilot on');
+      console.log('Autopilot stopped. Start again with: npm run autopilot:on');
       if (rs.length) console.log(formatResults(rs));
     } finally { io.close(); }
   });
@@ -197,7 +197,7 @@ program.command('dashboard')
   });
 
 program.command('update')
-  .description('Update flop-pilot to the newest release (you run this when FLOP upgrades)')
+  .description('Update to the newest release (you run this when FLOP upgrades)')
   .action(async () => {
     const run = promisify(execFileCb);
     const cwd = pjoin(dirname(fileURLToPath(import.meta.url)), '..');

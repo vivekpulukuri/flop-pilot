@@ -35,9 +35,9 @@ export function resumeAll(home: string): void {
 
 /** Why a real (non-practice) manual action must not run now, or null. With checkLock, also refuses while a tick runs. */
 export function actionGate(ctx: Ctx, o: { checkLock?: boolean } = {}): string | null {
-  if (ctx.config.killed) return 'The autopilot is stopped by the kill switch. Run: flop-pilot autopilot on';
-  if (ctx.config.paused) return 'Paused. Resume first (flop-pilot resume, or Resume on the Controls page).';
-  if (ctx.ledger.getState<number>(`runtimeBlocked:${ctx.network}`) !== null) return 'FLOP upgraded the chain. Run: flop-pilot update';
+  if (ctx.config.killed) return 'The autopilot is stopped by the kill switch. Run: npm run autopilot:on';
+  if (ctx.config.paused) return 'Paused. Resume first (npm run resume, or Resume on the Controls page).';
+  if (ctx.ledger.getState<number>(`runtimeBlocked:${ctx.network}`) !== null) return 'FLOP upgraded the chain. Run: npm run update';
   if (o.checkLock) {
     if (!acquireLock(paths(ctx.home).lock)) return 'The autopilot is running right now. Try again in a minute.';
     releaseLock(paths(ctx.home).lock);

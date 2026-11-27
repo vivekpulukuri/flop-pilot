@@ -18,7 +18,7 @@ export function layout(d: Data, active: string, title: string, body: Safe, autop
     <span class="lamp ${autopilotOn ? 'on' : ''}">${autopilotOn === null ? 'Autopilot status unknown' : autopilotOn ? 'Autopilot on' : 'Autopilot off'}</span>
     <span class="lamp ${c.practice ? 'warn' : 'on'}">${c.practice ? 'Practice mode: nothing is sent' : 'Live: claims and spends are real'}</span>
     ${c.killed ? html`<span class="lamp bad">Stopped by kill switch</span>` : c.paused ? html`<span class="lamp warn">Paused</span>` : ''}
-    ${d.runtimeBlocked ? html`<span class="lamp bad">Chain upgraded: run flop-pilot update</span>` : ''}
+    ${d.runtimeBlocked ? html`<span class="lamp bad">Chain upgraded: run npm run update</span>` : ''}
     <span class="lamp">${d.network === 'testnet' ? 'FLOP Testnet' : 'FLOP Devnet'}</span>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} · FLOP Pilot</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
@@ -39,8 +39,8 @@ function strip(d: Data, w: Data['wallets'][number]): Safe {
 }
 
 function headline(d: Data): { title: string; sub: string } {
-  if (d.config.killed) return { title: 'The autopilot is stopped.', sub: 'Turn it back on with: flop-pilot autopilot on' };
-  if (d.runtimeBlocked) return { title: 'FLOP upgraded the chain. Run flop-pilot update.', sub: 'Claims and spends wait until flop-pilot supports the new chain version.' };
+  if (d.config.killed) return { title: 'The autopilot is stopped.', sub: 'Turn it back on with: npm run autopilot:on' };
+  if (d.runtimeBlocked) return { title: 'FLOP upgraded the chain. Run npm run update.', sub: 'Claims and spends wait until flop-pilot supports the new chain version.' };
   const ready = d.wallets.filter((w) => w.row.claimer && w.nextClaim.ready);
   if (ready.length) return { title: `Wallet #${ready[0].row.idx} can claim now.`, sub: 'The autopilot claims on its next run, about every 15 minutes.' };
   const next = d.wallets.filter((w) => w.row.claimer && w.nextClaim.at).sort((a, b) => a.nextClaim.at!.getTime() - b.nextClaim.at!.getTime())[0];

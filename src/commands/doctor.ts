@@ -30,10 +30,10 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
   out.push({ name: 'macOS', ok: d.platform === 'darwin', detail: d.platform, fix: 'flop-pilot v1 runs on macOS only' });
 
   const hasVault = existsSync(paths(d.home).vault);
-  out.push({ name: 'Set up (init done)', ok: hasVault, fix: 'Run: flop-pilot init' });
+  out.push({ name: 'Set up (init done)', ok: hasVault, fix: 'Run: npm run init' });
   if (hasVault) {
     try { await unlockSeed(d.home, d.store); out.push({ name: 'Vault unlocks', ok: true }); }
-    catch (e) { out.push({ name: 'Vault unlocks', ok: false, detail: (e as Error).message, fix: 'Unlock your Mac Keychain, or restore with: flop-pilot init --restore' }); }
+    catch (e) { out.push({ name: 'Vault unlocks', ok: false, detail: (e as Error).message, fix: 'Unlock your Mac Keychain, or restore with: npm run init:restore' }); }
   }
 
   try { accessSync(paths(d.home).root, constants.W_OK); out.push({ name: 'Data folder writable', ok: true, detail: paths(d.home).root }); }
@@ -46,7 +46,7 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
     const g = await chain.genesisHash();
     out.push({ name: `Chain is FLOP ${c.network}`, ok: g === profile.genesis, detail: g, fix: 'Wrong chain — stop and check your network setting' });
     const spec = await chain.specVersion();
-    out.push({ name: 'Chain version supported', ok: d.isSupportedSpec(spec), detail: String(spec), fix: 'Run: flop-pilot update' });
+    out.push({ name: 'Chain version supported', ok: d.isSupportedSpec(spec), detail: String(spec), fix: 'Run: npm run update' });
   } catch (e) {
     out.push({ name: 'Chain RPC reachable', ok: false, detail: (e as Error).message, fix: 'Check your internet connection and try again' });
   } finally {
@@ -67,7 +67,7 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
   }
 
   const loaded = await d.launchdLoaded().catch(() => false);
-  out.push({ name: 'Autopilot installed', ok: true, warn: !loaded, detail: loaded ? 'loaded' : 'not installed', fix: loaded ? undefined : 'When ready: flop-pilot autopilot on' });
+  out.push({ name: 'Autopilot installed', ok: true, warn: !loaded, detail: loaded ? 'loaded' : 'not installed', fix: loaded ? undefined : 'When ready: npm run autopilot:on' });
   return out;
 }
 

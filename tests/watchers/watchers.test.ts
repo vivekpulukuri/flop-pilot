@@ -78,7 +78,7 @@ test('unsupported spec → blocked with one alert across two calls; supported ag
   expect(await checkRuntime(ctx, chain)).toBe('unsupported');
   const alerts = ctx.ledger.listAlerts(true).filter((a) => a.kind === 'runtime_unsupported');
   expect(alerts).toHaveLength(1);
-  expect(alerts[0].message).toBe('FLOP upgraded the chain. Run: flop-pilot update');
+  expect(alerts[0].message).toBe('FLOP upgraded the chain. Run: npm run update');
   expect(ctx.ledger.getState('runtimeBlocked:testnet')).toBe(1014099);
   chain.spec = 1014039;
   expect(await checkRuntime(ctx, chain)).toBe('upgraded');

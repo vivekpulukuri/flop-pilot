@@ -83,13 +83,17 @@ added 160 packages in 20s
 > `flop-pilot`, move it into your home folder (the one with your name in Finder), then run
 > `cd ~/flop-pilot && npm ci`.
 
-## Step 4: Make the `flop-pilot` command available
+## Step 4: Check the commands work
+
+Every command in this guide is an `npm run …` command, and it runs from inside the `flop-pilot`
+folder. Your Terminal is in that folder now. **Whenever you open a new Terminal window, first run
+`cd ~/flop-pilot`.**
 
 ```sh
-echo 'alias flop-pilot="node $HOME/flop-pilot/dist/cli.js"' >> ~/.zshrc && source ~/.zshrc && flop-pilot --version
+npm run pilot -- --version
 ```
 
-You should see:
+You should see two lines from npm starting with `>` (that's normal for every `npm run` command), then:
 
 ```
 0.1.0
@@ -100,7 +104,7 @@ You should see:
 Start on **devnet** (FLOP's development network) to practise safely:
 
 ```sh
-flop-pilot init --network devnet
+npm run init
 ```
 
 It shows 24 words in a numbered grid. **Write all 24 on paper, in order.** These words are the
@@ -118,12 +122,12 @@ Word #19:
 You should see:
 
 ```
-Set up done. Network: devnet. Practice mode is ON (nothing is signed or sent). Next: flop-pilot doctor
+Set up done. Network: devnet. Practice mode is ON (nothing is signed or sent). Next: npm run doctor
 ```
 
 Your words are stored encrypted on this Mac, and the password for them sits in your Mac's
 Keychain. If a box asks whether `security` may use the "flop-pilot" item, click **Always Allow**. You never need to type them again unless you move to a new Mac
-(`flop-pilot init --restore`).
+(`npm run init:restore`).
 
 > **If you see `The words did not match after 3 tries`:** nothing was saved. Run the command again.
 > You get a new set of 24 words; write those down instead.
@@ -131,7 +135,7 @@ Keychain. If a box asks whether `security` may use the "flop-pilot" item, click 
 ## Step 6: Check everything
 
 ```sh
-flop-pilot doctor
+npm run doctor
 ```
 
 You should see ticks:
@@ -148,7 +152,7 @@ You should see ticks:
 ✓ Faucet is FLOP Devnet  (0x99c1…d631)
 ✓ Install location works with the autopilot  (/Users/you/flop-pilot/dist/cli.js)
 ! Autopilot installed  (not installed)
-    → When ready: flop-pilot autopilot on
+    → When ready: npm run autopilot:on
 ```
 
 The long codes and folder names will differ on your Mac; `you` is your Mac user name. The `!` on the last line is fine for now. Any `✗` line has a `→` line under it that says how to fix it.
@@ -158,8 +162,8 @@ The long codes and folder names will differ on your Mac; `you` is your Mac user 
 Practice mode is on, so nothing is signed or sent. Try:
 
 ```sh
-flop-pilot wallets
-flop-pilot fund
+npm run wallets
+npm run fund
 ```
 
 You should see your 3 wallet addresses: `claimer:yes` means the wallet collects from the faucet,
@@ -174,7 +178,7 @@ and `enrolled:no` means it isn't registered as an agent yet. Then:
 Now open your dashboard:
 
 ```sh
-flop-pilot dashboard
+npm run dashboard
 ```
 
 Your browser opens a page showing your three wallets as coloured strips. If no page opens, copy the
@@ -187,8 +191,8 @@ window to keep typing commands. To close the dashboard, click its Terminal windo
 ## Step 8: Do it for real on devnet
 
 ```sh
-flop-pilot practice off
-flop-pilot fund --wallet 0
+npm run practice:off
+npm run fund -- --wallet 0
 ```
 
 You should see a real claim:
@@ -201,8 +205,8 @@ The network needs about a minute to make that payment final. Wait a minute, then
 wallet as an agent and try spending:
 
 ```sh
-flop-pilot enroll
-flop-pilot spend
+npm run enroll
+npm run spend
 ```
 
 You should see:
@@ -227,8 +231,8 @@ once you add one (step 10). Wallets #1 and #2 claim and enroll on their own once
 ## Step 9: Switch to Testnet and turn on the autopilot
 
 ```sh
-flop-pilot network testnet
-flop-pilot autopilot on
+npm run network:testnet
+npm run autopilot:on
 ```
 
 You should see:
@@ -254,18 +258,19 @@ From now on, every 15 minutes (and whenever your Mac wakes up), the autopilot:
 
 **Sharing your internet with another FLOP Pilot user?** The faucet allows 3 claims per
 connection per day in total. Agree on a split. For example, one of you runs
-`flop-pilot claimers 2` and the other runs `flop-pilot claimers 1`.
+`npm run claimers:2` and the other runs `npm run claimers:1`.
 
 ## Step 10: Add miners to buy from
 
 When a miner shares their address and endpoint (see FLOP's website, https://flop.network), add it.
-Replace both parts in angle brackets, including the `<` and `>`:
+Replace both parts in angle brackets, including the `<` and `>`. Keep the `--`: it tells npm
+that the rest belongs to FLOP Pilot.
 
 ```sh
-flop-pilot miners add <miner address> <miner endpoint>
+npm run miners:add -- <miner address> <miner endpoint>
 ```
 
-For example: `flop-pilot miners add 5GrmgqmvwX2WgedTsz7UTJix9k4az2NdEBT9my4yFnRTD23m https://miner.example.com`
+For example: `npm run miners:add -- 5GrmgqmvwX2WgedTsz7UTJix9k4az2NdEBT9my4yFnRTD23m https://miner.example.com`
 
 You can also do this on the dashboard's **Controls** tab. The autopilot only pays miners that are
 not linked to your own wallets. If you run a miner yourself, list its address under
@@ -273,20 +278,20 @@ not linked to your own wallets. If you run a miner yourself, list its address un
 
 ## Step 11: Daily life
 
-- Open the dashboard whenever you like: `flop-pilot dashboard`.
+- Open the dashboard whenever you like: `npm run dashboard`.
 - The **Overview** tab tells you what happens next, for example "Next claim in 3 h 12 m, wallet #1."
 - Your Mac shows a notification when something needs you:
-  - **"FLOP upgraded the chain. Run: flop-pilot update"**: run `cd ~/flop-pilot && flop-pilot update`. The autopilot waits until you do, then carries on by itself.
-  - **"The testnet timeline page changed"**: FLOP may have announced when earning starts. Read the page, then enter the start block on the **Rules and alerts** tab or with `flop-pilot activation <block>`.
+  - **"FLOP upgraded the chain. Run: npm run update"**: run `cd ~/flop-pilot && npm run update`. The autopilot waits until you do, then carries on by itself.
+  - **"The testnet timeline page changed"**: FLOP may have announced when earning starts. Read the page, then enter the start block on the **Rules and alerts** tab or with `npm run activation -- <block>`.
   - **"Rules page changed"**: read what changed on the **Rules and alerts** tab.
-- Pause anytime with `flop-pilot pause` (and `flop-pilot resume`). Stop everything with `flop-pilot stop`.
+- Pause anytime with `npm run pause` (and `npm run resume`). Stop everything with `npm run stop`.
 
 Something not working? See [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Uninstall
 
 ```sh
-flop-pilot autopilot off
+npm run autopilot:off
 ```
 
 Then, **only after checking your 24 words are safely on paper**:

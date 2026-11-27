@@ -23,5 +23,5 @@ export async function runUpdate(d: { cwd: string; exec: Exec; doctor: () => Prom
   await git('checkout', '--quiet', tag);
   await d.exec('npm', ['ci', '--no-fund', '--no-audit'], d.cwd);
   const healthy = await d.doctor();
-  return { ok: healthy, message: healthy ? `Updated to ${tag}. All checks pass.` : `Updated to ${tag}, but some checks failed. Run: flop-pilot doctor` };
+  return { ok: healthy, message: healthy ? `Updated to ${tag}. All checks pass.` : `Updated to ${tag}, but some checks failed. Run: npm run doctor` };
 }
