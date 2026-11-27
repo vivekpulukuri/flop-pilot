@@ -43,7 +43,7 @@ test('Windows DPAPI get with no blob file → null', async () => {
 
 test('Linux desktop with a session bus and secret-tool → Secret Service, secret via stdin', async () => {
   const r = rec((_f, args) => (args[0] === 'lookup' ? 'pw-from-keyring\n' : ''));
-  const s = secretStoreFor(home(), { plat: 'linux', exec: r.exec, env: { DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus' }, hasCommand: () => true });
+  const s = secretStoreFor(home(), { plat: 'linux', exec: r.exec, env: { DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', DISPLAY: ':0' }, hasCommand: () => true });
   expect(s.kind).toBe('secret-service');
   await s.set('s3');
   expect(r.calls[0]).toMatchObject({ file: 'secret-tool', input: 's3' });

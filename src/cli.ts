@@ -12,7 +12,7 @@ import { runInit } from './commands/init.js';
 import { setClaimers, setNetwork, setPractice } from './commands/settings.js';
 import { listWalletsCmd } from './commands/wallets.js';
 import { terminalIO, askHidden } from './sys/prompt.js';
-import { storeFor, setUnlockMode, passphraseStore } from './platform/passphrase.js';
+import { storeFor, setUnlockMode, passphraseStore, vaultUnlockMode } from './platform/passphrase.js';
 import { schedulerFor } from './autopilot/scheduler.js';
 import { secretStoreFor, currentPlat } from './platform/secrets.js';
 import { realExec } from './sys/exec.js';
@@ -188,7 +188,7 @@ ap.command('run')
     const home = pilotHome();
     const c = loadConfig(home);
     const d = deps();
-    if (c.unlock === 'passphrase') { const pw = await askHidden('Passphrase: '); d.store = passphraseStore(async () => pw); }
+    if (vaultUnlockMode(home) === 'passphrase') { const pw = await askHidden('Passphrase: '); d.store = passphraseStore(async () => pw); }
     const ac = new AbortController();
     process.on('SIGINT', () => { console.log('\nStopping after this run…'); ac.abort(); });
     console.log(`Autopilot running every ${c.tickMinutes} min. Keep this window open. Press Control+C to stop.`);
@@ -215,7 +215,8 @@ program.command('stop')
     requireSetup(pilotHome());
     const io = await terminalIO();
     try {
-      const rs = await stopAll(pilotHome(), { deactivate: o.deactivate, deps: deps(), confirm: () => io.ask('Type DEACTIVATE to confirm: ') });
+      const d = { ...deps(), store: storeFor(pilotHome(), { ask: () => io.askSecret!('Passphrase: ') }) };
+      const rs = await stopAll(pilotHome(), { deactivate: o.deactivate, deps: d, confirm: () => io.ask('Type DEACTIVATE to confirm: ') });
       console.log('Autopilot stopped. Start again with: npm run autopilot:on');
       if (rs.length) console.log(formatResults(rs));
     } finally { io.close(); }
@@ -228,7 +229,7 @@ program.command('dashboard')
     requireSetup(pilotHome());
     const home = pilotHome();
     let store: import('./core/types.js').SecretStore | undefined = keychain(home);
-    if (loadConfig(home).unlock === 'passphrase') {
+    if (vaultUnlockMode(home) === 'passphrase') {
       const pw = process.stdin.isTTY ? await askHidden('Passphrase (press Return to skip; the Claim now / Spend now buttons need it): ') : '';
       if (pw) { store = passphraseStore(async () => pw); await unlockSeed(home, store); } else store = undefined;
     }
@@ -268,7 +269,9 @@ program.command('unlock <mode>')
     if (mode !== 'auto' && mode !== 'passphrase') throw new Error('Use: npm run unlock:auto   or   npm run unlock:passphrase');
     const io = await terminalIO();
     try {
-      await setUnlockMode(pilotHome(), mode, { current: keychain(pilotHome()), auto: osStore(pilotHome()), io });
+      // Ask for the current passphrase through the already-open prompt, so nothing is echoed.
+      const current = storeFor(pilotHome(), { ask: () => io.askSecret!('Current passphrase: ') });
+      await setUnlockMode(pilotHome(), mode, { current, auto: osStore(pilotHome()), io });
       console.log(mode === 'passphrase' ? 'Done. From now on, start the autopilot with: npm run autopilot:run' : 'Done. You can now run: npm run autopilot:on');
       if (mode === 'passphrase') await autopilotOff(pilotHome()).catch(() => {});
     } finally { io.close(); }

@@ -64,10 +64,16 @@ export function keyFileStore(home: string): KindedStore {
   };
 }
 
-export function secretStoreFor(home: string, o: { plat: Plat; exec: ExecFn; env: NodeJS.ProcessEnv; hasCommand?: (c: string) => boolean }): KindedStore {
+export function secretStoreFor(home: string, o: { plat: Plat; exec: ExecFn; env: NodeJS.ProcessEnv; hasCommand?: (c: string) => boolean; kind?: StoreKind | null }): KindedStore {
+  // A store chosen at setup is reused as is: cron runs without the desktop session, so re-detecting would pick wrong.
+  if (o.kind === 'keychain') return Object.assign(macKeychain(o.exec, keychainAccount(home)), { kind: 'keychain' as const, weak: false });
+  if (o.kind === 'dpapi') return dpapiStore(home, o.exec);
+  if (o.kind === 'secret-service') return secretToolStore(keychainAccount(home), o.exec);
+  if (o.kind === 'key-file') return keyFileStore(home);
   if (o.plat === 'darwin') return Object.assign(macKeychain(o.exec, keychainAccount(home)), { kind: 'keychain' as const, weak: false });
   if (o.plat === 'win32') return dpapiStore(home, o.exec);
   const has = o.hasCommand ?? ((c: string) => realHasCommand(c, o.env));
-  if (o.env.DBUS_SESSION_BUS_ADDRESS && has('secret-tool')) return secretToolStore(keychainAccount(home), o.exec);
+  const desktop = !!(o.env.DISPLAY || o.env.WAYLAND_DISPLAY);
+  if (desktop && o.env.DBUS_SESSION_BUS_ADDRESS && has('secret-tool')) return secretToolStore(keychainAccount(home), o.exec);
   return keyFileStore(home);
 }

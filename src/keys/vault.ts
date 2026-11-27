@@ -6,10 +6,12 @@ import { paths } from '../core/paths.js';
 export interface VaultFile {
   v: 1; kdf: 'scrypt'; N: number; r: number; p: number;
   salt: string; iv: string; tag: string; ct: string;
+  /** How this vault is unlocked; switching modes rewrites the file atomically, so this is the source of truth. */
+  unlock?: 'auto' | 'passphrase';
 }
 
 export class VaultLockedError extends Error {
-  constructor(msg = 'The wallet vault is locked: the macOS Keychain did not return its password.') {
+  constructor(msg = "The wallet vault is locked: your computer's secure store did not return its password.") {
     super(msg);
     this.name = 'VaultLockedError';
   }
@@ -22,7 +24,7 @@ function key(password: string, salt: Buffer, n: number, r: number, p: number): B
   return scryptSync(password, salt, 32, { N: n, r, p, maxmem: MAXMEM });
 }
 
-export function encryptSeed(seed: string, password: string): VaultFile {
+export function encryptSeed(seed: string, password: string, unlock: 'auto' | 'passphrase' = 'auto'): VaultFile {
   const salt = randomBytes(16);
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key(password, salt, N, R, P), iv);
@@ -30,7 +32,7 @@ export function encryptSeed(seed: string, password: string): VaultFile {
   return {
     v: 1, kdf: 'scrypt', N, r: R, p: P,
     salt: salt.toString('base64'), iv: iv.toString('base64'),
-    tag: cipher.getAuthTag().toString('base64'), ct: ct.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'), ct: ct.toString('base64'), unlock,
   };
 }
 

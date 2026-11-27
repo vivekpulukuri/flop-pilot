@@ -73,8 +73,9 @@ test('doctor names the password store and warns when it is the key file', async 
 });
 
 test('doctor in passphrase mode does not try to unlock (it would prompt)', async () => {
-  const { updateConfig } = await import('../../src/core/config.js');
-  updateConfig(home, { unlock: 'passphrase' });
+  const { setUnlockMode } = await import('../../src/platform/passphrase.js');
+  const pio = { print() {}, clear() {}, ask: async () => 'paper passphrase 1', askSecret: async () => 'paper passphrase 1' };
+  await setUnlockMode(home, 'passphrase', { current: store, auto: store, io: pio });
   const cs = await runDoctor(base({ store: memSecretStore(null), storeKind: { kind: 'passphrase', weak: false } }));
   expect(byName(cs, 'Vault unlocks')).toMatchObject({ ok: true, detail: expect.stringMatching(/passphrase/) });
 });

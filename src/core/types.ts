@@ -26,6 +26,8 @@ export interface Config {
   dashboardPort: number;
   /** auto: vault password kept in the OS store; passphrase: owner types a passphrase written on paper. */
   unlock: 'auto' | 'passphrase';
+  /** Which OS store holds the vault password in auto mode, chosen once at setup (null = decide now). */
+  store: 'keychain' | 'dpapi' | 'secret-service' | 'key-file' | null;
 }
 
 export interface FaucetLimits {

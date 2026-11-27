@@ -6,6 +6,7 @@ import { paths } from '../core/paths.js';
 import { NETWORK_PROFILES } from '../core/networks.js';
 import { unlockSeed } from '../keys/vault.js';
 import { protectedFolder, protectedFolderHint } from '../autopilot/launchd.js';
+import { vaultUnlockMode } from '../platform/passphrase.js';
 
 export interface Check { name: string; ok: boolean; warn?: boolean; detail?: string; fix?: string; }
 
@@ -30,7 +31,7 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
   const profile = NETWORK_PROFILES[c.network];
   const [, maj, min] = /^v?(\d+)\.(\d+)/.exec(d.nodeVersion) ?? []; const major = Number(maj ?? 0), minor = Number(min ?? 0);
   out.push({ name: 'Node.js 22.13 or newer', ok: major > 22 || (major === 22 && minor >= 13), detail: d.nodeVersion, fix: 'Install Node.js 22 LTS from https://nodejs.org' });
-  out.push({ name: 'macOS', ok: d.platform === 'darwin', detail: d.platform, fix: 'flop-pilot v1 runs on macOS only' });
+  out.push({ name: 'Supported system', ok: ['darwin', 'win32', 'linux'].includes(d.platform), detail: ({ darwin: 'macOS', win32: 'Windows', linux: 'Linux' } as Record<string, string>)[d.platform] ?? d.platform, fix: 'FLOP Pilot runs on macOS, Windows and Linux' });
 
   const hasVault = existsSync(paths(d.home).vault);
   out.push({ name: 'Set up (init done)', ok: hasVault, fix: 'Run: npm run init' });
@@ -38,11 +39,11 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
     out.push({ name: 'Password store', ok: true, warn: d.storeKind.weak, detail: STORE_NAMES[d.storeKind.kind] ?? d.storeKind.kind,
       fix: d.storeKind.weak ? 'This computer has no keyring, so the vault password is in ~/.flop-pilot/vault.key. Anyone who can log in as you can read it. Prefer a passphrase written on paper? Run: npm run unlock:passphrase' : undefined });
   }
-  if (hasVault && c.unlock === 'passphrase') {
+  if (hasVault && vaultUnlockMode(d.home) === 'passphrase') {
     out.push({ name: 'Vault unlocks', ok: true, detail: 'passphrase mode: you type it when you start' });
   } else if (hasVault) {
     try { await unlockSeed(d.home, d.store); out.push({ name: 'Vault unlocks', ok: true }); }
-    catch (e) { out.push({ name: 'Vault unlocks', ok: false, detail: (e as Error).message, fix: 'Unlock your Mac Keychain, or restore with: npm run init:restore' }); }
+    catch (e) { out.push({ name: 'Vault unlocks', ok: false, detail: (e as Error).message, fix: 'Log in to your computer so its secure store unlocks, or restore from your 24 words on a fresh install (npm run init:restore)' }); }
   }
 
   try { accessSync(paths(d.home).root, constants.W_OK); out.push({ name: 'Data folder writable', ok: true, detail: paths(d.home).root }); }

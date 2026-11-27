@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mnemonicGenerate, mnemonicValidate, cryptoWaitReady } from '@polkadot/util-crypto';
-import type { Network, SecretStore } from '../core/types.js';
+import type { Config, Network, SecretStore } from '../core/types.js';
+import { keyFileStore, type StoreKind } from '../platform/secrets.js';
 import { ensureDirs, paths } from '../core/paths.js';
 import { loadConfig, saveConfig } from '../core/config.js';
 import { encryptSeed, newVaultPassword, writeVault } from '../keys/vault.js';
@@ -38,11 +39,11 @@ function grid(words: string[]): string {
   return rows.join('\n');
 }
 
-export async function runInit(o: { home: string; network: Network; restore: boolean; io: PromptIO; store: SecretStore; rng?: () => number; unlock?: 'auto' | 'passphrase' }): Promise<void> {
+export async function runInit(o: { home: string; network: Network; restore: boolean; io: PromptIO; store: SecretStore & { kind?: StoreKind }; rng?: () => number; unlock?: 'auto' | 'passphrase' }): Promise<void> {
   const { home, io } = o;
   const rng = o.rng ?? Math.random;
   if (existsSync(paths(home).vault)) {
-    throw new Error('flop-pilot is already set up on this Mac. To restore from your 24 words, use a fresh install with `init --restore`.');
+    throw new Error('flop-pilot is already set up on this computer. To restore from your 24 words, use a fresh install with `init --restore`.');
   }
   await cryptoWaitReady();
 
@@ -90,10 +91,22 @@ export async function runInit(o: { home: string; network: Network; restore: bool
   }
 
   ensureDirs(home);
-  if (unlock === 'auto') await o.store.set(pw);
-  writeVault(paths(home).vault, encryptSeed(seed, pw));
+  let storeKind: StoreKind | null = null;
+  if (unlock === 'auto') {
+    storeKind = o.store.kind ?? null;
+    try {
+      await o.store.set(pw);
+    } catch (e) {
+      if (o.store.kind !== 'secret-service') throw e;
+      // Desktop keyring refused (locked, or reached over SSH): fall back to the key file and say so.
+      await keyFileStore(home).set(pw);
+      storeKind = 'key-file';
+      io.print('The desktop keyring was not available, so the vault password is kept in ~/.flop-pilot/vault.key (only you can read it).');
+    }
+  }
+  writeVault(paths(home).vault, encryptSeed(seed, pw, unlock));
 
-  const config = { ...loadConfig(home), network: o.network, practice: true, unlock };
+  const config = { ...loadConfig(home), network: o.network, practice: true, unlock, store: storeKind as Config['store'] };
   saveConfig(home, config);
 
   const ledger = openLedger(paths(home).ledger);

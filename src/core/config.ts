@@ -21,6 +21,7 @@ export const DEFAULT_CONFIG: Config = Object.freeze({
   activationBlock: { devnet: null, testnet: null },
   dashboardPort: 4747,
   unlock: 'auto',
+  store: null,
 }) as Config;
 
 function clone(c: Config): Config {

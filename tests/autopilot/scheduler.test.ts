@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cronLine, mergeCrontab, removeFromCrontab, vbsLauncher, schtasksCreateArgs, schedulerFor, jobName } from '../../src/autopilot/scheduler.js';
+import { cronLine, mergeCrontab, removeFromCrontab, vbsLauncher, schedulerFor, jobName } from '../../src/autopilot/scheduler.js';
 import { protectedFolder } from '../../src/autopilot/launchd.js';
 import { ensureDirs } from '../../src/core/paths.js';
 import type { ExecFn } from '../../src/sys/exec.js';
@@ -55,17 +55,13 @@ test('REVIEW-FOCUS-2: Windows .vbs runs hidden (window style 0), sets FLOP_PILOT
   expect(v).toContain('sh.Run "cmd /c """"C:\\Program Files\\nodejs\\node.exe"" ""C:\\Users\\Ann Lee\\flop-pilot\\dist\\cli.js"" tick >> ""C:\\Users\\Ann Lee\\.flop-pilot\\logs\\autopilot.log"" 2>&1""", 0, False');
 });
 
-test('schtasks create args run the vbs through wscript every N minutes, replacing any old task', () => {
-  expect(schtasksCreateArgs('flop-pilot', 'C:\\Users\\Ann Lee\\.flop-pilot\\run-tick.vbs', 15)).toEqual(['/Create', '/F', '/SC', 'MINUTE', '/MO', '15', '/TN', 'flop-pilot', '/TR', 'wscript.exe "C:\\Users\\Ann Lee\\.flop-pilot\\run-tick.vbs"']);
-});
-
 test('windows scheduler writes the vbs and calls schtasks; uninstall deletes both', async () => {
   const home = join(mkdtempSync(join(tmpdir(), 'fpsch-')), 'h'); ensureDirs(home);
   const calls: string[][] = [];
   const exec: ExecFn = async (f, args) => { calls.push([f, ...args]); return { stdout: '' }; };
   const s = schedulerFor('win32', exec);
   await s.install({ home, nodePath: 'C:\\node.exe', cliPath: 'C:\\fp\\dist\\cli.js', intervalMin: 15 });
-  expect(readFileSync(join(home, 'run-tick.vbs'), 'utf8')).toContain('tick');
+  expect(readFileSync(join(home, 'run-tick.vbs')).toString('utf16le')).toContain('tick');
   expect(calls[0][0]).toBe('schtasks');
   expect(await s.isInstalled(home)).toBe(true);
   await s.uninstall(home);

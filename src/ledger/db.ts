@@ -49,7 +49,9 @@ export function userVersion(db: DB): number {
 
 export function openDb(path: string): DB {
   const db = new DatabaseSync(path);
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  // busy_timeout must come first: the journal_mode change itself can hit a lock held by another process.
+  db.exec('PRAGMA busy_timeout = 5000;');
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   for (let v = userVersion(db); v < MIGRATIONS.length; v++) {
     db.exec('BEGIN');
     try {

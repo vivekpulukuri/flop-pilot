@@ -6,7 +6,7 @@ import type { ExecFn } from '../sys/exec.js';
 import type { Plat } from '../platform/secrets.js';
 import { installAgent, isLoaded, launchdLabel, uninstallAgent } from './launchd.js';
 
-export interface InstallOpts { home: string; nodePath: string; cliPath: string; intervalMin: number }
+export interface InstallOpts { home: string; nodePath: string; cliPath: string; intervalMin: number; env?: Record<string, string> }
 export interface Scheduler {
   install(o: InstallOpts): Promise<string>;
   uninstall(home: string): Promise<void>;
@@ -27,7 +27,8 @@ const TAG = (name: string) => `# flop-pilot:${name}`;
 
 export function cronLine(o: InstallOpts, name: string): string {
   const when = o.intervalMin >= 1 && o.intervalMin <= 59 ? `*/${Math.round(o.intervalMin)} * * * *` : '0 * * * *';
-  return `${when} FLOP_PILOT_HOME=${shq(o.home)} ${shq(o.nodePath)} ${shq(o.cliPath)} tick >> ${shq(logOf(o.home))} 2>&1 ${TAG(name)}`;
+  const extra = Object.entries(o.env ?? {}).map(([k, v]) => `${k}=${shq(v)} `).join('');
+  return `${when} ${extra}FLOP_PILOT_HOME=${shq(o.home)} ${shq(o.nodePath)} ${shq(o.cliPath)} tick >> ${shq(logOf(o.home))} 2>&1 ${TAG(name)}`;
 }
 
 function tidy(lines: string[]): string {
@@ -50,9 +51,11 @@ function cronScheduler(exec: ExecFn): Scheduler {
   const read = async () => {
     try { return (await exec('crontab', ['-l'])).stdout; }
     catch (e) {
-      const err = e as NodeJS.ErrnoException & { code?: number | string };
+      const err = e as Error & { code?: number | string | null };
       if (err.code === 'ENOENT') throw new Error('cron is not installed. Install it (for example: sudo apt install cron), then try again.');
-      return ''; // "no crontab for user"
+      if (err.code === 1 && /no crontab/i.test(err.message)) return '';
+      // Anything else (timeout, permission, directory lookup): never risk overwriting the user's jobs.
+      throw new Error(`Could not read your existing cron jobs (${err.message}); nothing was changed.`);
     }
   };
   const write = (tab: string) => exec('crontab', ['-'], { input: tab });
@@ -77,21 +80,52 @@ export function vbsLauncher(o: { home: string; nodePath: string; cliPath: string
   ].join('\r\n');
 }
 
-export function schtasksCreateArgs(name: string, vbsPath: string, intervalMin: number): string[] {
-  return ['/Create', '/F', '/SC', 'MINUTE', '/MO', String(Math.max(1, Math.round(intervalMin))), '/TN', name, '/TR', `wscript.exe "${vbsPath}"`];
+const xmlEsc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Task definition: runs on battery, starts missed runs when the PC wakes, never two at once. */
+export function taskXml(vbsPath: string, intervalMin: number): string {
+  return `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>FLOP Pilot autopilot</Description></RegistrationInfo>
+  <Triggers>
+    <TimeTrigger>
+      <Repetition><Interval>PT${Math.max(1, Math.round(intervalMin))}M</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
+      <StartBoundary>2026-01-01T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+    </TimeTrigger>
+  </Triggers>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <ExecutionTimeLimit>PT30M</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions>
+    <Exec><Command>wscript.exe</Command><Arguments>"${xmlEsc(vbsPath)}"</Arguments></Exec>
+  </Actions>
+</Task>
+`;
 }
+
+/** Windows Script Host and schtasks read UTF-16LE with a BOM correctly for any user name. */
+const writeUtf16 = (file: string, text: string) => writeFileSync(file, '\ufeff' + text, 'utf16le');
 
 function windowsScheduler(exec: ExecFn): Scheduler {
   const vbsPath = (home: string) => join(home, 'run-tick.vbs');
+  const xmlPath = (home: string) => join(home, 'task.xml');
   return {
     async install(o) {
-      writeFileSync(vbsPath(o.home), vbsLauncher(o));
-      await exec('schtasks', schtasksCreateArgs(jobName(o.home), vbsPath(o.home), o.intervalMin));
+      writeUtf16(vbsPath(o.home), vbsLauncher(o));
+      writeUtf16(xmlPath(o.home), taskXml(vbsPath(o.home), o.intervalMin));
+      await exec('schtasks', ['/Create', '/F', '/TN', jobName(o.home), '/XML', xmlPath(o.home)]);
       return `Task Scheduler task "${jobName(o.home)}"`;
     },
     async uninstall(home) {
       try { await exec('schtasks', ['/Delete', '/F', '/TN', jobName(home)]); } catch { /* not installed */ }
       rmSync(vbsPath(home), { force: true });
+      rmSync(xmlPath(home), { force: true });
     },
     async isInstalled(home) { try { await exec('schtasks', ['/Query', '/TN', jobName(home)]); return true; } catch { return false; } },
   };

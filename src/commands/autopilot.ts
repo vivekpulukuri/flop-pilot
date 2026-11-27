@@ -16,16 +16,19 @@ import { openLedger } from '../ledger/ledger.js';
 import { acquireLock, releaseLock } from '../autopilot/lock.js';
 import { runTick, type TickSummary } from '../autopilot/tick.js';
 import { unlockSeed } from '../keys/vault.js';
+import { vaultUnlockMode } from '../platform/passphrase.js';
 
 const CLI_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'cli.js');
 
 export const PASSPHRASE_NO_BACKGROUND = "Passphrase mode can't unlock your wallets in the background. Keep a Terminal window open and run: npm run autopilot:run (on a server, run it inside tmux or screen so it keeps going after you log out).";
 
 export async function autopilotOn(home: string): Promise<string> {
-  if (loadConfig(home).unlock === 'passphrase') throw new Error(PASSPHRASE_NO_BACKGROUND);
+  if (vaultUnlockMode(home) === 'passphrase') throw new Error(PASSPHRASE_NO_BACKGROUND);
   updateConfig(home, { killed: false, paused: false });
   const c = loadConfig(home);
-  return scheduler().install({ home, nodePath: process.execPath, cliPath: CLI_PATH, intervalMin: c.tickMinutes });
+  const bus = process.env.DBUS_SESSION_BUS_ADDRESS;
+  const env = currentPlat() === 'linux' && c.store === 'secret-service' && bus ? { DBUS_SESSION_BUS_ADDRESS: bus } : undefined;
+  return scheduler().install({ home, nodePath: process.execPath, cliPath: CLI_PATH, intervalMin: c.tickMinutes, env });
 }
 
 /** Clears pause, kill switch and faucet stops (after the owner has read the alerts). */
