@@ -47,7 +47,8 @@
     "init:passphrase": "node dist/cli.js init --passphrase",
     "autopilot:run": "node dist/cli.js autopilot run",
     "unlock:passphrase": "node dist/cli.js unlock passphrase",
-    "unlock:auto": "node dist/cli.js unlock auto"
+    "unlock:auto": "node dist/cli.js unlock auto",
+    "about": "node dist/cli.js --version"
   },
   "files": [
     "dist",
