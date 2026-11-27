@@ -36,8 +36,7 @@ with no action needed. The dashboard shows what happened and why.
 **Non-goals (v1)**
 - Running a miner or validator.
 - Mainnet.
-- Windows or Linux support. The guide and launchd setup are macOS-only. The code should not
-  block a later port.
+- (v0.1 only) Windows/Linux: added in v0.2, see §10.
 - A hosted or multi-user dashboard. Each person runs their own copy.
 - Voucher trading, which is disabled on Testnet anyway.
 
@@ -367,3 +366,23 @@ an expected-output block after each step, and a "if you see X, do Y" box.
   - practice mode signs nothing.
 - Devnet end-to-end run before any testnet run.
 - Dashboard smoke test: the token is required, and the server is bound to 127.0.0.1.
+
+## 10. Cross-platform support (v0.2, approved 2026-11-27)
+
+Friends use macOS, Windows, Linux desktops and Linux servers. Same tool and same `npm run …`
+commands everywhere; only the OS adapters differ.
+
+| Piece | macOS | Windows | Linux desktop | Linux server (no desktop) |
+|---|---|---|---|---|
+| Vault password store | Keychain (`security`) | DPAPI via PowerShell (`ProtectedData`, CurrentUser) in `~/.flop-pilot/vault.key.dpapi` | Secret Service (`secret-tool`), when installed and a session bus exists | **key file** `~/.flop-pilot/vault.key` (mode 0600); `doctor` warns it is weaker (owner-approved) |
+| Autopilot every N min | launchd | Task Scheduler (`schtasks`), launched hidden through a `.vbs` wrapper | cron | cron |
+| Notifications | `osascript` | PowerShell tray balloon | `notify-send` (if present) | none (dashboard alerts) |
+| Open dashboard | `open` | `rundll32 url.dll,FileProtocolHandler` | `xdg-open` | print link + `ssh -L 4747:127.0.0.1:4747 …` tunnel hint |
+| Folder-freeze guard | Documents/Desktop/Downloads/iCloud | n/a | n/a | n/a |
+
+Rules:
+- Secrets never go on a command line on Windows/Linux (stdin or environment only).
+- cron over systemd timers: servers need no `enable-linger`; a missed run is caught up by the next one.
+- One job per data folder on every OS (same per-home naming as launchd labels).
+- The guide warns: running on a server **and** a laptop is two installs for one person — not allowed.
+- CI runs `npm ci`, `npm test` and `npm run build` on ubuntu, windows and macos for every push.
