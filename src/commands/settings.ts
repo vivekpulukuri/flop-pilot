@@ -1,3 +1,4 @@
+import { decodeAddress } from '@polkadot/util-crypto';
 import type { Network, SecretStore } from '../core/types.js';
 import { NETWORKS } from '../core/types.js';
 import { loadConfig, updateConfig } from '../core/config.js';
@@ -39,4 +40,25 @@ export async function setNetwork(home: string, n: Network, store: SecretStore): 
     l.close();
   }
   updateConfig(home, { network: n });
+}
+
+export function isSs58(a: string): boolean {
+  try { decodeAddress(a); return /^[1-9A-HJ-NP-Za-km-z]{46,48}$/.test(a); } catch { return false; }
+}
+
+/** Owner-supplied miner endpoint (https, or http on localhost for operators testing their own box). */
+export function addMinerEndpoint(home: string, address: string, url: string): void {
+  if (!isSs58(address)) throw new Error(`"${address}" is not a valid FLOP address.`);
+  let u: URL;
+  try { u = new URL(url); } catch { throw new Error(`"${url}" is not a valid URL; use https://…`); }
+  const local = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+  if (u.protocol !== 'https:' && !(local && u.protocol === 'http:')) throw new Error('Miner endpoints must use https:// (http:// only for localhost).');
+  const clean = u.toString().replace(/\/$/, '');
+  const c = loadConfig(home);
+  updateConfig(home, { minerEndpoints: [...c.minerEndpoints.filter((e) => e.address !== address), { address, url: clean }] });
+}
+
+export function removeMinerEndpoint(home: string, address: string): void {
+  const c = loadConfig(home);
+  updateConfig(home, { minerEndpoints: c.minerEndpoints.filter((e) => e.address !== address) });
 }

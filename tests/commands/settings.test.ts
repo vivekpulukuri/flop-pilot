@@ -49,3 +49,15 @@ test('setNetwork("testnet") adds testnet wallets and leaves devnet rows unchange
   expect(l.listWallets('testnet')[0].address).not.toBe(devBefore[0].address);
   l.close();
 });
+
+test('addMinerEndpoint validates SS58 and https URL; removeMinerEndpoint removes it', async () => {
+  const { addMinerEndpoint, removeMinerEndpoint } = await import('../../src/commands/settings.js');
+  const addr = '5GrmgqmvwX2WgedTsz7UTJix9k4az2NdEBT9my4yFnRTD23m';
+  expect(() => addMinerEndpoint(home, 'not-an-address', 'https://m.example')).toThrow(/address/i);
+  expect(() => addMinerEndpoint(home, addr, 'ftp://m.example')).toThrow(/https/i);
+  addMinerEndpoint(home, addr, 'https://m.example/');
+  addMinerEndpoint(home, addr, 'https://m2.example');
+  expect(loadConfig(home).minerEndpoints).toEqual([{ address: addr, url: 'https://m2.example' }]);
+  removeMinerEndpoint(home, addr);
+  expect(loadConfig(home).minerEndpoints).toEqual([]);
+});

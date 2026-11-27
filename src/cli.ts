@@ -19,6 +19,8 @@ import { isLoaded } from './autopilot/launchd.js';
 import { createFaucet } from './faucet/sdk-faucet.js';
 import { runFund, formatResults } from './commands/fund.js';
 import { runEnroll } from './commands/enroll.js';
+import { runSpend } from './commands/spend.js';
+import { addMinerEndpoint, removeMinerEndpoint } from './commands/settings.js';
 import type { RuntimeDeps } from './runtime.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -112,6 +114,23 @@ program.command('enroll')
   .action(async (o: { dryRun?: boolean }) => {
     console.log(formatResults(await runEnroll(deps(), o)));
   });
+
+program.command('spend')
+  .description('Spend each enrolled wallet\'s balance on inference from independent miners')
+  .option('--wallet <n>', 'only this wallet (0-2)', walletOpt)
+  .option('--dry-run', 'show what would happen without sending anything')
+  .action(async (o: { wallet?: number; dryRun?: boolean }) => {
+    console.log(formatResults(await runSpend(deps(), o)));
+  });
+
+const miners = program.command('miners').description('Miner endpoints you can buy inference from');
+miners.command('list').action(() => {
+  requireSetup(pilotHome());
+  const list = loadConfig(pilotHome()).minerEndpoints;
+  console.log(list.length ? list.map((e) => `${e.address}  ${e.url}`).join('\n') : 'No miner endpoints yet. Add one: flop-pilot miners add <address> <https-url>');
+});
+miners.command('add <address> <url>').action((a: string, u: string) => { requireSetup(pilotHome()); addMinerEndpoint(pilotHome(), a, u); console.log('Added.'); });
+miners.command('remove <address>').action((a: string) => { requireSetup(pilotHome()); removeMinerEndpoint(pilotHome(), a); console.log('Removed.'); });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));
