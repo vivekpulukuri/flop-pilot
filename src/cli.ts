@@ -20,6 +20,7 @@ import { createFaucet } from './faucet/sdk-faucet.js';
 import { runFund, formatResults } from './commands/fund.js';
 import { runEnroll } from './commands/enroll.js';
 import { runSpend } from './commands/spend.js';
+import { setActivationBlock } from './watchers/mode.js';
 import { addMinerEndpoint, removeMinerEndpoint } from './commands/settings.js';
 import type { RuntimeDeps } from './runtime.js';
 
@@ -131,6 +132,15 @@ miners.command('list').action(() => {
 });
 miners.command('add <address> <url>').action((a: string, u: string) => { requireSetup(pilotHome()); addMinerEndpoint(pilotHome(), a, u); console.log('Added.'); });
 miners.command('remove <address>').action((a: string) => { requireSetup(pilotHome()); removeMinerEndpoint(pilotHome(), a); console.log('Removed.'); });
+
+program.command('activation <block>')
+  .description('Enter the announced block where voucher earning starts (or "clear")')
+  .action((b: string) => {
+    requireSetup(pilotHome());
+    const c = loadConfig(pilotHome());
+    setActivationBlock(pilotHome(), c.network, b === 'clear' ? null : Number(b));
+    console.log(b === 'clear' ? 'Activation block cleared.' : `Earning starts at ${c.network} block ${b}.`);
+  });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));
