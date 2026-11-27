@@ -26,6 +26,12 @@ import { runTick } from './autopilot/tick.js';
 import { autopilotOn, autopilotOff, autopilotStatus, stopAll } from './commands/autopilot.js';
 import { updateConfig } from './core/config.js';
 import { serveDashboard } from './commands/dashboard.js';
+import { runUpdate } from './commands/update.js';
+import { runExport } from './commands/export.js';
+import { writeFileSync } from 'node:fs';
+import { dirname, join as pjoin } from 'node:path';
+import { execFile as execFileCb } from 'node:child_process';
+import { promisify } from 'node:util';
 import { addMinerEndpoint, removeMinerEndpoint } from './commands/settings.js';
 import type { RuntimeDeps } from './runtime.js';
 
@@ -188,6 +194,32 @@ program.command('dashboard')
   .action(async (o: { open: boolean }) => {
     requireSetup(pilotHome());
     await serveDashboard({ home: pilotHome(), env: realEnv({ version: VERSION }), store: keychain(pilotHome()), makeChain: (n) => createSdkChain(n), open: o.open });
+  });
+
+program.command('update')
+  .description('Update flop-pilot to the newest release (you run this when FLOP upgrades)')
+  .action(async () => {
+    const run = promisify(execFileCb);
+    const cwd = pjoin(dirname(fileURLToPath(import.meta.url)), '..');
+    const r = await runUpdate({
+      cwd,
+      exec: async (file, args, dir) => ({ stdout: (await run(file, args, { cwd: dir, encoding: 'utf8', timeout: 300000 })).stdout }),
+      doctor: async () => { try { await run(process.execPath, [pjoin(cwd, 'dist', 'cli.js'), 'doctor'], { encoding: 'utf8' }); return true; } catch { return false; } },
+    });
+    console.log(r.message);
+    if (!r.ok) process.exitCode = 1;
+  });
+
+program.command('export')
+  .description('Save your claims and purchases to a file (IP address left out by default)')
+  .option('--json', 'JSON instead of CSV')
+  .option('--with-ip', 'include your origin IP address')
+  .action((o: { json?: boolean; withIp?: boolean }) => {
+    requireSetup(pilotHome());
+    const format = o.json ? 'json' : 'csv';
+    const file = `flop-pilot-export-${new Date().toISOString().slice(0, 10)}.${format}`;
+    writeFileSync(file, runExport(pilotHome(), { format, withIp: !!o.withIp, network: loadConfig(pilotHome()).network }));
+    console.log(`Saved ${file}`);
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {

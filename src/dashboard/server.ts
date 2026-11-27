@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { Hono } from 'hono';
-import type { ChainPort, Env, SecretStore } from '../core/types.js';
+import type { ChainPort, Env, FaucetPort, Network, SecretStore } from '../core/types.js';
 import { loadConfig } from '../core/config.js';
 import { paths } from '../core/paths.js';
 import type { Ledger } from '../ledger/ledger.js';
@@ -22,6 +22,7 @@ export interface DashboardDeps {
   port: number;
   autopilotLoaded?: () => Promise<boolean>;
   store?: SecretStore;
+  makeFaucet?: (n: Network, env: Env) => FaucetPort;
 }
 
 export function createApp(deps: DashboardDeps) {

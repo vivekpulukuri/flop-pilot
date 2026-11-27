@@ -58,5 +58,6 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .why { color: var(--muted); font-size: 14px; }
 svg.bars rect.c { fill: var(--warn); } svg.bars rect.s { fill: var(--focus); }
 .empty { color: var(--muted); background: var(--panel); padding: 16px; }
+.stopform { margin-top: 12px; } section + section { margin-top: 8px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 `;
