@@ -25,6 +25,7 @@ import { setActivationBlock } from './watchers/mode.js';
 import { runTick } from './autopilot/tick.js';
 import { autopilotOn, autopilotOff, autopilotStatus, stopAll } from './commands/autopilot.js';
 import { updateConfig } from './core/config.js';
+import { serveDashboard } from './commands/dashboard.js';
 import { addMinerEndpoint, removeMinerEndpoint } from './commands/settings.js';
 import type { RuntimeDeps } from './runtime.js';
 
@@ -179,6 +180,14 @@ program.command('stop')
       console.log('Autopilot stopped. Start again with: flop-pilot autopilot on');
       if (rs.length) console.log(formatResults(rs));
     } finally { io.close(); }
+  });
+
+program.command('dashboard')
+  .description('Open your local dashboard in the browser')
+  .option('--no-open', 'print the link instead of opening the browser')
+  .action(async (o: { open: boolean }) => {
+    requireSetup(pilotHome());
+    await serveDashboard({ home: pilotHome(), env: realEnv({ version: VERSION }), store: keychain(pilotHome()), makeChain: (n) => createSdkChain(n), open: o.open });
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {

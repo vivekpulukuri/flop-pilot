@@ -20,7 +20,7 @@ const keys = (ctx: Ctx, idx?: number) => ({
   stopped: `claimsStopped:${ctx.network}`,
 });
 
-const SKIP_TEXT: Record<SkipReason, string> = {
+export const SKIP_TEXT: Record<SkipReason, string> = {
   not_claimer: 'not a claiming wallet (see `flop-pilot claimers`)',
   wallet_stopped: 'wallet stopped after a faucet refusal; check alerts',
   claims_stopped: 'all claims stopped after a faucet report; check alerts',

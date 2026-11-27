@@ -61,3 +61,9 @@ test('detectPoolReset returns curr.asOf when used drops, else null', () => {
   expect(detectPoolReset(prev, curr)).toEqual(new Date('2026-11-28T00:00:30.000Z'));
   expect(detectPoolReset(curr, { ...curr, usedFlop: 5000 })).toBeNull();
 });
+
+test('detectPoolReset ignores small drops from a rolling window (needs > 50% drop)', () => {
+  const prev = { ...OPEN_LIMITS, usedFlop: 251790 };
+  expect(detectPoolReset(prev, { ...prev, usedFlop: 251215 })).toBeNull();
+  expect(detectPoolReset(prev, { ...prev, usedFlop: 100000, asOf: '2026-11-28T00:00:00.000Z' })).toEqual(new Date('2026-11-28T00:00:00.000Z'));
+});

@@ -49,5 +49,6 @@ export function nextBackoff(attempt: number): number {
 }
 
 export function detectPoolReset(prev: FaucetLimits, curr: FaucetLimits): Date | null {
-  return curr.usedFlop < prev.usedFlop ? new Date(curr.asOf) : null;
+  // The cap may be a rolling window; only a large drop means the pool actually refilled.
+  return curr.usedFlop < prev.usedFlop * 0.5 ? new Date(curr.asOf) : null;
 }

@@ -1,0 +1,27 @@
+import { randomBytes } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { serve } from '@hono/node-server';
+import type { ChainPort, Env, Network, SecretStore } from '../core/types.js';
+import { loadConfig } from '../core/config.js';
+import { paths } from '../core/paths.js';
+import { openLedger } from '../ledger/ledger.js';
+import { createApp } from '../dashboard/server.js';
+import { isLoaded, launchdLabel } from '../autopilot/launchd.js';
+
+export async function serveDashboard(o: { home: string; env: Env; store: SecretStore; makeChain: (n: Network) => Promise<ChainPort>; open: boolean }): Promise<void> {
+  const c = loadConfig(o.home);
+  const token = randomBytes(24).toString('base64url');
+  const app = createApp({
+    home: o.home, env: o.env, token, port: c.dashboardPort, store: o.store,
+    ledgerOf: () => openLedger(paths(o.home).ledger),
+    chainOf: () => o.makeChain(loadConfig(o.home).network),
+    autopilotLoaded: () => isLoaded(launchdLabel(o.home)),
+  });
+  await new Promise<void>((resolve, reject) => {
+    const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: c.dashboardPort }, () => resolve());
+    server.on('error', (e: NodeJS.ErrnoException) => reject(e.code === 'EADDRINUSE' ? new Error(`Port ${c.dashboardPort} is busy. Is the dashboard already open in another window?`) : e));
+  });
+  const url = `http://127.0.0.1:${c.dashboardPort}/?t=${token}`;
+  console.log(`Dashboard running at ${url}\nKeep this window open while you use it. Press Ctrl+C to close it.`);
+  if (o.open) execFile('/usr/bin/open', [url], () => {});
+}
