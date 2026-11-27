@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { execFile } from 'node:child_process';
 import { serve } from '@hono/node-server';
 import type { ChainPort, Env, Network, SecretStore } from '../core/types.js';
 import { loadConfig } from '../core/config.js';
@@ -9,6 +8,7 @@ import { createApp } from '../dashboard/server.js';
 import { schedulerFor } from '../autopilot/scheduler.js';
 import { currentPlat } from '../platform/secrets.js';
 import { realExec } from '../sys/exec.js';
+import { openUrlCommand, tunnelHint } from '../sys/env.js';
 
 export async function serveDashboard(o: { home: string; env: Env; store: SecretStore | undefined; makeChain: (n: Network) => Promise<ChainPort>; open: boolean }): Promise<void> {
   const c = loadConfig(o.home);
@@ -25,5 +25,7 @@ export async function serveDashboard(o: { home: string; env: Env; store: SecretS
   });
   const url = `http://127.0.0.1:${c.dashboardPort}/?t=${token}`;
   console.log(`Dashboard running at ${url}\nKeep this window open while you use it. Press Ctrl+C to close it.`);
-  if (o.open) execFile('/usr/bin/open', [url], () => {});
+  const cmd = openUrlCommand(url, currentPlat(), process.env);
+  if (!cmd) console.log(tunnelHint(c.dashboardPort));
+  else if (o.open) realExec(cmd.file, cmd.args).catch(() => console.log('Could not open a browser; paste the link above into one.'));
 }
