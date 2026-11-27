@@ -1,3 +1,3 @@
-// Test-only seed. Never funded on any network.
+// Test-only seed for unit tests. Never funded or used on any network; never use it for anything real.
 export const TEST_SEED =
-  'draft easy include stadium vast usage elbow loyal fortune dirt clump damp hedgehog audit ride million suggest sniff brand furnace chunk nut easily heart';
+  'artefact clever display glad slight fence section tattoo noble pitch token knee duck sense garage much lock wear fish grass south aware bright camera';
