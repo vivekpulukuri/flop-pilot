@@ -12,6 +12,7 @@ import { setClaimers, setNetwork, setPractice } from './commands/settings.js';
 import { listWalletsCmd } from './commands/wallets.js';
 import { terminalIO, askHidden } from './sys/prompt.js';
 import { storeFor, setUnlockMode, passphraseStore } from './platform/passphrase.js';
+import { schedulerFor } from './autopilot/scheduler.js';
 import { secretStoreFor, currentPlat } from './platform/secrets.js';
 import { realExec } from './sys/exec.js';
 import { unlockSeed } from './keys/vault.js';
@@ -120,7 +121,7 @@ program.command('doctor')
       home, store: keychain(home), storeKind: keychain(home), nodeVersion: process.version, platform: process.platform,
       chain: () => createSdkChain(c.network),
       faucetChain: async () => (await (await env.fetch(`${NETWORK_PROFILES[c.network].faucet}/chain`, { signal: AbortSignal.timeout(15000) })).json()) as { network: string; genesisHash: string },
-      launchdLoaded: () => isLoaded(launchdLabel(home)), isSupportedSpec, cliPath: fileURLToPath(import.meta.url),
+      launchdLoaded: () => schedulerFor(currentPlat(), realExec).isInstalled(home), isSupportedSpec, cliPath: fileURLToPath(import.meta.url),
     });
     console.log(formatChecks(checks));
     if (checks.some((x) => !x.ok)) process.exitCode = 1;

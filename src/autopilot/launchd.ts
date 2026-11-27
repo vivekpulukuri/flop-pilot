@@ -25,7 +25,8 @@ const PROTECTED: [string, string][] = [
  * macOS privacy protection (TCC) silently blocks background jobs from reading these folders, so an autopilot
  * installed from there hangs at startup. Returns the folder's friendly name, or null.
  */
-export function protectedFolder(path: string): string | null {
+export function protectedFolder(path: string, plat: string = process.platform): string | null {
+  if (plat !== 'darwin') return null;
   const p = resolve(path);
   for (const [rel, name] of PROTECTED) {
     const base = join(homedir(), rel);

@@ -2,7 +2,12 @@ import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { loadConfig, updateConfig } from '../core/config.js';
 import type { ActionResult } from '../core/ctx.js';
-import { installAgent, isLoaded, launchdLabel, uninstallAgent } from '../autopilot/launchd.js';
+import { schedulerFor, jobName } from '../autopilot/scheduler.js';
+import { currentPlat } from '../platform/secrets.js';
+import { realExec } from '../sys/exec.js';
+import { launchdLabel } from '../autopilot/launchd.js';
+
+const scheduler = () => schedulerFor(currentPlat(), realExec);
 import { openRuntime, type RuntimeDeps } from '../runtime.js';
 import type { Ctx } from '../core/ctx.js';
 import { NETWORKS } from '../core/types.js';
@@ -20,7 +25,7 @@ export async function autopilotOn(home: string): Promise<string> {
   if (loadConfig(home).unlock === 'passphrase') throw new Error(PASSPHRASE_NO_BACKGROUND);
   updateConfig(home, { killed: false, paused: false });
   const c = loadConfig(home);
-  return installAgent({ home, nodePath: process.execPath, cliPath: CLI_PATH, intervalSec: c.tickMinutes * 60 });
+  return scheduler().install({ home, nodePath: process.execPath, cliPath: CLI_PATH, intervalMin: c.tickMinutes });
 }
 
 /** Clears pause, kill switch and faucet stops (after the owner has read the alerts). */
@@ -68,13 +73,13 @@ export async function runLoop(deps: RuntimeDeps, o: { intervalMs: number; maxTic
 }
 
 export async function autopilotOff(home: string): Promise<void> {
-  await uninstallAgent(home);
+  await scheduler().uninstall(home);
 }
 
 export async function autopilotStatus(home: string): Promise<{ loaded: boolean; label: string; paused: boolean; killed: boolean; practice: boolean }> {
   const c = loadConfig(home);
-  const label = launchdLabel(home);
-  return { loaded: await isLoaded(label), label, paused: c.paused, killed: c.killed, practice: c.practice };
+  const label = currentPlat() === 'darwin' ? launchdLabel(home) : jobName(home);
+  return { loaded: await scheduler().isInstalled(home), label, paused: c.paused, killed: c.killed, practice: c.practice };
 }
 
 /** Kill switch: stops the autopilot at once; optionally deactivates agent wallets on chain after confirmation. */

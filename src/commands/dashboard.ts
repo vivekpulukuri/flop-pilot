@@ -6,7 +6,9 @@ import { loadConfig } from '../core/config.js';
 import { paths } from '../core/paths.js';
 import { openLedger } from '../ledger/ledger.js';
 import { createApp } from '../dashboard/server.js';
-import { isLoaded, launchdLabel } from '../autopilot/launchd.js';
+import { schedulerFor } from '../autopilot/scheduler.js';
+import { currentPlat } from '../platform/secrets.js';
+import { realExec } from '../sys/exec.js';
 
 export async function serveDashboard(o: { home: string; env: Env; store: SecretStore | undefined; makeChain: (n: Network) => Promise<ChainPort>; open: boolean }): Promise<void> {
   const c = loadConfig(o.home);
@@ -15,7 +17,7 @@ export async function serveDashboard(o: { home: string; env: Env; store: SecretS
     home: o.home, env: o.env, token, port: c.dashboardPort, store: o.store,
     ledgerOf: () => openLedger(paths(o.home).ledger),
     chainOf: () => o.makeChain(loadConfig(o.home).network),
-    autopilotLoaded: () => isLoaded(launchdLabel(o.home)),
+    autopilotLoaded: () => schedulerFor(currentPlat(), realExec).isInstalled(o.home),
   });
   await new Promise<void>((resolve, reject) => {
     const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: c.dashboardPort }, () => resolve());
