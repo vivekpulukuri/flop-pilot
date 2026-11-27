@@ -3,7 +3,7 @@ import { realEnv } from '../../src/sys/env.js';
 
 test('notify passes title and body as argv, never interpolated into the script', async () => {
   const calls: { file: string; args: string[] }[] = [];
-  const env = realEnv({ version: '0.1.0', execFile: async (file, args) => { calls.push({ file, args }); return { stdout: '' }; } });
+  const env = realEnv({ version: '0.1.0', plat: 'darwin', execFile: async (file, args) => { calls.push({ file, args }); return { stdout: '' }; } });
   await env.notify('FLOP "upgraded"', 'Run: flop-pilot update"; do shell script "rm -rf ~"');
   expect(calls[0].file).toBe('/usr/bin/osascript');
   const script = calls[0].args.filter((_, i, a) => a[i - 1] === '-e').join('\n');

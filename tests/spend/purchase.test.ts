@@ -65,7 +65,7 @@ test('happy path: 0600 intent file, output file, settlement_posted rows with cha
   expect(rows[0]).toMatchObject({ miner: '5MinerIndependent', independence: 'independent', public_ip: '203.0.113.7' });
   expect(rows[0].channel_id).toMatch(/^0xch/);
   const intentFile = join(paths(ctx.home).intents, `${rows[0].intent_id}.json`);
-  expect(statSync(intentFile).mode & 0o777).toBe(0o600);
+  if (process.platform !== 'win32') expect(statSync(intentFile).mode & 0o777).toBe(0o600);
   expect(readdirSync(paths(ctx.home).outputs)).toHaveLength(2);
   expect(readFileSync(rows[0].output_path!, 'utf8')).toContain('ok answer');
 });

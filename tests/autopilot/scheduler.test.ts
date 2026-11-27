@@ -76,5 +76,5 @@ test('windows scheduler writes the vbs and calls schtasks; uninstall deletes bot
 test('protectedFolder is macOS-only', () => {
   expect(protectedFolder(`${homedir()}/Documents/flop-pilot/dist/cli.js`, 'linux')).toBeNull();
   expect(protectedFolder(`${homedir()}/Documents/flop-pilot/dist/cli.js`, 'win32')).toBeNull();
-  expect(protectedFolder(`${homedir()}/Documents/flop-pilot/dist/cli.js`, 'darwin')).toBe('Documents');
+  expect(protectedFolder(join(homedir(), 'Documents', 'flop-pilot', 'dist', 'cli.js'), 'darwin')).toBe('Documents');
 });

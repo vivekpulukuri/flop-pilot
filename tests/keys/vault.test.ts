@@ -33,7 +33,7 @@ test('writeVault writes mode 0600 and refuses to overwrite', () => {
   const home = join(mkdtempSync(join(tmpdir(), 'fp-')), 'h'); ensureDirs(home);
   const file = paths(home).vault;
   writeVault(file, encryptSeed(TEST_SEED, 'pw'));
-  expect(statSync(file).mode & 0o777).toBe(0o600);
+  if (process.platform !== 'win32') expect(statSync(file).mode & 0o777).toBe(0o600);
   expect(() => writeVault(file, encryptSeed(TEST_SEED, 'pw'))).toThrow();
   expect(readVault(file).kdf).toBe('scrypt');
   expect(readFileSync(file, 'utf8')).not.toContain(TEST_SEED.split(' ')[0] + ' ');

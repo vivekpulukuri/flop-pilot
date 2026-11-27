@@ -27,18 +27,19 @@ test('launchdLabel is the plain label for the default home and suffixed for othe
 test('protectedFolder flags macOS privacy-protected folders that block background jobs', async () => {
   const { protectedFolder } = await import('../../src/autopilot/launchd.js');
   const h = homedir();
-  expect(protectedFolder(`${h}/Documents/flop-pilot/dist/cli.js`)).toBe('Documents');
-  expect(protectedFolder(`${h}/Desktop/flop-pilot/dist/cli.js`)).toBe('Desktop');
-  expect(protectedFolder(`${h}/Downloads/x/dist/cli.js`)).toBe('Downloads');
-  expect(protectedFolder(`${h}/Library/Mobile Documents/com~apple~CloudDocs/x/cli.js`)).toBe('iCloud Drive');
-  expect(protectedFolder(`${h}/flop-pilot/dist/cli.js`)).toBeNull();
-  expect(protectedFolder(`${h}/Documentsx/cli.js`)).toBeNull();
+  const P = (p: string) => protectedFolder(join(h, p), 'darwin');
+  expect(P('Documents/flop-pilot/dist/cli.js')).toBe('Documents');
+  expect(P('Desktop/flop-pilot/dist/cli.js')).toBe('Desktop');
+  expect(P('Downloads/x/dist/cli.js')).toBe('Downloads');
+  expect(P('Library/Mobile Documents/com~apple~CloudDocs/x/cli.js')).toBe('iCloud Drive');
+  expect(P('flop-pilot/dist/cli.js')).toBeNull();
+  expect(P('Documentsx/cli.js')).toBeNull();
 });
 
 test('installAgent refuses a project inside a protected folder with a move hint, before touching launchd', async () => {
   const { installAgent } = await import('../../src/autopilot/launchd.js');
   const calls: string[][] = [];
-  await expect(installAgent({ home: '/tmp/h', nodePath: '/n', cliPath: `${homedir()}/Documents/flop-pilot/dist/cli.js`, intervalSec: 900, exec: async (_f, a) => { calls.push(a); }, agentsDir: '/tmp/agents-x' }))
+  await expect(installAgent({ home: '/tmp/h', nodePath: '/n', cliPath: join(homedir(), 'Documents', 'flop-pilot', 'dist', 'cli.js'), intervalSec: 900, exec: async (_f, a) => { calls.push(a); }, agentsDir: '/tmp/agents-x' }))
     .rejects.toThrow(/Documents.*move the flop-pilot folder/i);
   expect(calls).toEqual([]);
 });

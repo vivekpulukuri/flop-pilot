@@ -45,7 +45,7 @@ test('success writes 0600 vault, keychain password, practice config and 3 wallet
   const store = memSecretStore();
   const io = scriptedIO('right');
   await runInit({ home, network: 'devnet', restore: false, io, store, rng: () => 0.3 });
-  expect(statSync(paths(home).vault).mode & 0o777).toBe(0o600);
+  if (process.platform !== 'win32') expect(statSync(paths(home).vault).mode & 0o777).toBe(0o600);
   expect(store.value).toBeTruthy();
   const c = loadConfig(home);
   expect(c.practice).toBe(true);

@@ -56,7 +56,7 @@ test('autopilot not loaded is a warning only', async () => {
   expect(byName(cs, 'Autopilot installed')).toMatchObject({ ok: true, warn: true });
 });
 
-test('project inside Documents → install-location check fails with the move hint', async () => {
+test.skipIf(process.platform !== 'darwin')('project inside Documents → install-location check fails with the move hint', async () => {
   const { homedir } = await import('node:os');
   const cs = await runDoctor(base({ cliPath: `${homedir()}/Documents/flop-pilot/dist/cli.js` }));
   expect(byName(cs, 'Install location works with the autopilot')).toMatchObject({ ok: false, fix: expect.stringMatching(/move the flop-pilot folder/i) });

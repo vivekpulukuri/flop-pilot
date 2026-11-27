@@ -34,7 +34,7 @@ test('saveConfig leaves no temp files behind and file is mode 0600', () => {
   saveConfig(home, DEFAULT_CONFIG);
   const files = readdirSync(paths(home).root);
   expect(files.filter((f) => f.includes('.tmp'))).toEqual([]);
-  expect(statSync(paths(home).config).mode & 0o777).toBe(0o600);
+  if (process.platform !== 'win32') expect(statSync(paths(home).config).mode & 0o777).toBe(0o600);
 });
 
 test('loadConfig fills missing keys from defaults (older config files)', () => {
@@ -48,7 +48,7 @@ test('loadConfig fills missing keys from defaults (older config files)', () => {
 test('ensureDirs creates root with mode 0700 and subdirs', () => {
   ensureDirs(home);
   const p = paths(home);
-  expect(statSync(p.root).mode & 0o777).toBe(0o700);
+  if (process.platform !== 'win32') expect(statSync(p.root).mode & 0o777).toBe(0o700);
   for (const d of [p.intents, p.tasks, p.outputs, p.logs]) expect(statSync(d).isDirectory()).toBe(true);
 });
 

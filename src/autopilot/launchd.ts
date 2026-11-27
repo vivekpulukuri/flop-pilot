@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve, sep } from 'node:path';
 
 export const LAUNCHD_LABEL = 'io.floppilot.autopilot';
 const run = promisify(execFile);
@@ -30,7 +30,7 @@ export function protectedFolder(path: string, plat: string = process.platform): 
   const p = resolve(path);
   for (const [rel, name] of PROTECTED) {
     const base = join(homedir(), rel);
-    if (p === base || p.startsWith(base + '/')) return name;
+    if (p === base || p.startsWith(base + sep)) return name;
   }
   return null;
 }
@@ -48,7 +48,7 @@ export function plistPath(label: string, agentsDir = join(homedir(), 'Library', 
 const x = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export function renderPlist(o: { label: string; nodePath: string; cliPath: string; home: string; intervalSec: number }): string {
-  const log = join(o.home, 'logs', 'autopilot.log');
+  const log = posix.join(o.home, 'logs', 'autopilot.log');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -84,7 +84,7 @@ export async function isLoaded(label = LAUNCHD_LABEL, exec: Exec = realExec): Pr
 }
 
 export async function installAgent(o: { home: string; nodePath: string; cliPath: string; intervalSec: number; exec?: Exec; agentsDir?: string }): Promise<string> {
-  const blocked = protectedFolder(o.cliPath);
+  const blocked = protectedFolder(o.cliPath, 'darwin');
   if (blocked) throw new Error(protectedFolderHint(blocked, dirname(dirname(o.cliPath))));
   const exec = o.exec ?? realExec;
   const label = launchdLabel(o.home);
