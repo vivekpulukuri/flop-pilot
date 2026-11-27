@@ -1,6 +1,7 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
-export type DB = Database.Database;
+/** Node's built-in SQLite: no native module to compile on any OS. */
+export type DB = DatabaseSync;
 
 const MIGRATIONS: string[] = [
   `
@@ -42,16 +43,23 @@ const MIGRATIONS: string[] = [
   `,
 ];
 
+export function userVersion(db: DB): number {
+  return Number((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
+}
+
 export function openDb(path: string): DB {
-  const db = new Database(path);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  const current = db.pragma('user_version', { simple: true }) as number;
-  for (let v = current; v < MIGRATIONS.length; v++) {
-    db.transaction(() => {
+  const db = new DatabaseSync(path);
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  for (let v = userVersion(db); v < MIGRATIONS.length; v++) {
+    db.exec('BEGIN');
+    try {
       db.exec(MIGRATIONS[v]);
-      db.pragma(`user_version = ${v + 1}`);
-    })();
+      db.exec(`PRAGMA user_version = ${v + 1}`);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
   }
   return db;
 }

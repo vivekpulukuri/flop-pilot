@@ -1,6 +1,6 @@
 import { chmodSync, existsSync } from 'node:fs';
 import type { Network } from '../core/types.js';
-import { openDb } from './db.js';
+import { openDb, userVersion } from './db.js';
 
 export type ClaimStatus = 'pending' | 'accepted' | 'refused' | 'unavailable' | 'unknown' | 'finalized';
 export type SpendStatus = 'prepared' | 'settlement_posted' | 'settled' | 'refunded' | 'unconfirmed' | 'failed';
@@ -64,14 +64,14 @@ export function openLedger(path: string) {
 
   const ledger = {
     close: () => db.close(),
-    schemaVersion: () => db.pragma('user_version', { simple: true }) as number,
+    schemaVersion: () => userVersion(db),
 
     upsertWallet(w: { network: Network; index: number; address: string; claimer: boolean }) {
       db.prepare(`INSERT INTO wallets (network, idx, address, claimer) VALUES (?, ?, ?, ?)
         ON CONFLICT (network, idx) DO UPDATE SET address = excluded.address, claimer = excluded.claimer`).run(w.network, w.index, w.address, w.claimer ? 1 : 0);
     },
     listWallets(n: Network): WalletRow[] {
-      return (db.prepare('SELECT * FROM wallets WHERE network = ? ORDER BY idx').all(n) as Record<string, unknown>[]).map(toWallet);
+      return (db.prepare('SELECT * FROM wallets WHERE network = ? ORDER BY idx').all(n) as unknown as Record<string, unknown>[]).map(toWallet);
     },
     setWalletFlags(n: Network, index: number, p: Partial<{ enrolled: boolean; stopped: boolean; claimer: boolean }>) {
       for (const [k, v] of Object.entries(p)) {
@@ -88,16 +88,16 @@ export function openLedger(path: string) {
       if (q) db.prepare(q.sql).run({ ...Object.fromEntries(q.keys.map((k) => [k, (p as Record<string, unknown>)[k]])), __now: nowIso(), __id: id });
     },
     claimsSince(n: Network, since: Date): ClaimRow[] {
-      return db.prepare('SELECT * FROM claims WHERE network = ? AND ts >= ? ORDER BY ts').all(n, iso(since)) as ClaimRow[];
+      return db.prepare('SELECT * FROM claims WHERE network = ? AND ts >= ? ORDER BY ts').all(n, iso(since)) as unknown as ClaimRow[];
     },
     lastClaim(n: Network, index: number): ClaimRow | null {
-      return (db.prepare('SELECT * FROM claims WHERE network = ? AND wallet_idx = ? ORDER BY ts DESC, id DESC LIMIT 1').get(n, index) as ClaimRow | undefined) ?? null;
+      return (db.prepare('SELECT * FROM claims WHERE network = ? AND wallet_idx = ? ORDER BY ts DESC, id DESC LIMIT 1').get(n, index) as unknown as ClaimRow | undefined) ?? null;
     },
     claimsByStatus(n: Network, s: string[]): ClaimRow[] {
-      return db.prepare(`SELECT * FROM claims WHERE network = ? AND status IN (${s.map(() => '?').join(',')}) ORDER BY ts`).all(n, ...s) as ClaimRow[];
+      return db.prepare(`SELECT * FROM claims WHERE network = ? AND status IN (${s.map(() => '?').join(',')}) ORDER BY ts`).all(n, ...s) as unknown as ClaimRow[];
     },
     claimsForWallet(n: Network, index: number): ClaimRow[] {
-      return db.prepare('SELECT * FROM claims WHERE network = ? AND wallet_idx = ? ORDER BY ts').all(n, index) as ClaimRow[];
+      return db.prepare('SELECT * FROM claims WHERE network = ? AND wallet_idx = ? ORDER BY ts').all(n, index) as unknown as ClaimRow[];
     },
 
     insertSpend(r: NewSpend): number {
@@ -108,12 +108,12 @@ export function openLedger(path: string) {
       if (q) db.prepare(q.sql).run({ ...Object.fromEntries(q.keys.map((k) => [k, (p as Record<string, unknown>)[k]])), __now: nowIso(), __id: id });
     },
     spendsByStatus(n: Network, s: string[]): SpendRow[] {
-      return db.prepare(`SELECT * FROM spends WHERE network = ? AND status IN (${s.map(() => '?').join(',')}) ORDER BY ts`).all(n, ...s) as SpendRow[];
+      return db.prepare(`SELECT * FROM spends WHERE network = ? AND status IN (${s.map(() => '?').join(',')}) ORDER BY ts`).all(n, ...s) as unknown as SpendRow[];
     },
     spendsSince(n: Network, since: Date, index?: number): SpendRow[] {
       return index === undefined
-        ? db.prepare('SELECT * FROM spends WHERE network = ? AND ts >= ? ORDER BY ts').all(n, iso(since)) as SpendRow[]
-        : db.prepare('SELECT * FROM spends WHERE network = ? AND ts >= ? AND wallet_idx = ? ORDER BY ts').all(n, iso(since), index) as SpendRow[];
+        ? db.prepare('SELECT * FROM spends WHERE network = ? AND ts >= ? ORDER BY ts').all(n, iso(since)) as unknown as SpendRow[]
+        : db.prepare('SELECT * FROM spends WHERE network = ? AND ts >= ? AND wallet_idx = ? ORDER BY ts').all(n, iso(since), index) as unknown as SpendRow[];
     },
 
     startTick(mode: string, ts = nowIso()): number {
@@ -126,21 +126,21 @@ export function openLedger(path: string) {
       db.prepare('UPDATE ticks SET mode = ? WHERE id = ?').run(mode, id);
     },
     lastTick(): TickRow | null {
-      const r = db.prepare('SELECT * FROM ticks ORDER BY id DESC LIMIT 1').get() as Record<string, unknown> | undefined;
+      const r = db.prepare('SELECT * FROM ticks ORDER BY id DESC LIMIT 1').get() as unknown as Record<string, unknown> | undefined;
       if (!r) return null;
       return { id: r.id as number, started: r.started as string, ended: (r.ended as string) ?? null, mode: (r.mode as string) ?? null, summary: r.summary ? JSON.parse(r.summary as string) : null, errors: r.errors ? JSON.parse(r.errors as string) : [] };
     },
 
     addAlert(kind: string, message: string, dedupeKey?: string, ts = nowIso()): { created: boolean; id: number } {
       if (dedupeKey) {
-        const open = db.prepare('SELECT id FROM alerts WHERE dedupe_key = ? AND acknowledged = 0 LIMIT 1').get(dedupeKey) as { id: number } | undefined;
+        const open = db.prepare('SELECT id FROM alerts WHERE dedupe_key = ? AND acknowledged = 0 LIMIT 1').get(dedupeKey) as unknown as { id: number } | undefined;
         if (open) return { created: false, id: open.id };
       }
       const id = Number(db.prepare('INSERT INTO alerts (kind, message, dedupe_key, ts) VALUES (?, ?, ?, ?)').run(kind, message, dedupeKey ?? null, ts).lastInsertRowid);
       return { created: true, id };
     },
     listAlerts(onlyOpen = false): AlertRow[] {
-      const rows = db.prepare(`SELECT * FROM alerts ${onlyOpen ? 'WHERE acknowledged = 0' : ''} ORDER BY id DESC`).all() as Record<string, unknown>[];
+      const rows = db.prepare(`SELECT * FROM alerts ${onlyOpen ? 'WHERE acknowledged = 0' : ''} ORDER BY id DESC`).all() as unknown as Record<string, unknown>[];
       return rows.map((r) => ({ ...(r as unknown as AlertRow), acknowledged: !!r.acknowledged }));
     },
     ackAlert(id: number) {
@@ -148,7 +148,7 @@ export function openLedger(path: string) {
     },
 
     getState<T>(key: string): T | null {
-      const r = db.prepare('SELECT value FROM state WHERE key = ?').get(key) as { value: string } | undefined;
+      const r = db.prepare('SELECT value FROM state WHERE key = ?').get(key) as unknown as { value: string } | undefined;
       return r ? (JSON.parse(r.value) as T) : null;
     },
     setState(key: string, value: unknown) {
@@ -157,7 +157,7 @@ export function openLedger(path: string) {
     },
 
     lastSnapshot(url: string): SnapshotRow | null {
-      return (db.prepare('SELECT * FROM watch_snapshots WHERE url = ? ORDER BY id DESC LIMIT 1').get(url) as SnapshotRow | undefined) ?? null;
+      return (db.prepare('SELECT * FROM watch_snapshots WHERE url = ? ORDER BY id DESC LIMIT 1').get(url) as unknown as SnapshotRow | undefined) ?? null;
     },
     insertSnapshot(url: string, hash: string, text: string, ts = nowIso()) {
       db.prepare('INSERT INTO watch_snapshots (url, hash, text, ts) VALUES (?, ?, ?, ?)').run(url, hash, text, ts);
@@ -165,7 +165,7 @@ export function openLedger(path: string) {
 
     activity(n: Network, f: { type?: 'claim' | 'spend'; index?: number; outcome?: string; limit: number }): ActivityRow[] {
       const parts: string[] = [];
-      const params: unknown[] = [];
+      const params: (string | number)[] = [];
       const where = (alias: string) => {
         const w = [`${alias}.network = ?`];
         params.push(n);
@@ -176,7 +176,7 @@ export function openLedger(path: string) {
       if (f.type !== 'spend') parts.push(`SELECT 'claim' AS type, c.id, c.ts, c.wallet_idx, c.amount, NULL AS miner, c.status, c.tx_hash AS ref, c.public_ip, c.reason FROM claims c WHERE ${where('c')}`);
       if (f.type !== 'claim') parts.push(`SELECT 'spend' AS type, s.id, s.ts, s.wallet_idx, s.escrow AS amount, s.miner, s.status, s.channel_id AS ref, s.public_ip, s.error AS reason FROM spends s WHERE ${where('s')}`);
       params.push(f.limit);
-      return db.prepare(`${parts.join(' UNION ALL ')} ORDER BY ts DESC LIMIT ?`).all(...params) as ActivityRow[];
+      return db.prepare(`${parts.join(' UNION ALL ')} ORDER BY ts DESC LIMIT ?`).all(...params) as unknown as ActivityRow[];
     },
   };
   return ledger;

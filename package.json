@@ -8,7 +8,7 @@
     "flop-pilot": "dist/cli.js"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -61,13 +61,11 @@
     "@polkadot/keyring": "14.0.3",
     "@polkadot/util": "14.0.3",
     "@polkadot/util-crypto": "14.0.3",
-    "better-sqlite3": "^13.2.0",
     "commander": "^15.1.0",
     "diff": "^9.0.0",
     "hono": "^4.13.23"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.11",
     "typescript": "^7.0.2",
     "vitest": "^5.1.2"

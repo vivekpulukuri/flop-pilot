@@ -42,7 +42,7 @@ test('faucet genesis mismatch fails with a stop message', async () => {
 
 test('old Node and missing keychain item fail with fixes', async () => {
   const cs = await runDoctor(base({ nodeVersion: 'v20.1.0', store: memSecretStore(null) }));
-  expect(byName(cs, 'Node.js 22 or newer')).toMatchObject({ ok: false });
+  expect(byName(cs, 'Node.js 22.13 or newer')).toMatchObject({ ok: false });
   expect(byName(cs, 'Vault unlocks')).toMatchObject({ ok: false });
 });
 
@@ -77,4 +77,10 @@ test('doctor in passphrase mode does not try to unlock (it would prompt)', async
   updateConfig(home, { unlock: 'passphrase' });
   const cs = await runDoctor(base({ store: memSecretStore(null), storeKind: { kind: 'passphrase', weak: false } }));
   expect(byName(cs, 'Vault unlocks')).toMatchObject({ ok: true, detail: expect.stringMatching(/passphrase/) });
+});
+
+test('Node 22.12 is too old for built-in SQLite; 22.13 and 24 are fine', async () => {
+  expect(byName(await runDoctor(base({ nodeVersion: 'v22.12.0' })), 'Node.js 22.13 or newer').ok).toBe(false);
+  expect(byName(await runDoctor(base({ nodeVersion: 'v22.13.0' })), 'Node.js 22.13 or newer').ok).toBe(true);
+  expect(byName(await runDoctor(base({ nodeVersion: 'v24.1.0' })), 'Node.js 22.13 or newer').ok).toBe(true);
 });

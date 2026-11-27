@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './sys/quiet-warnings.js';
 import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import type { Network } from './core/types.js';

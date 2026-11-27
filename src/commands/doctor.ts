@@ -28,8 +28,8 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
   const out: Check[] = [];
   const c = loadConfig(d.home);
   const profile = NETWORK_PROFILES[c.network];
-  const major = Number(/^v?(\d+)/.exec(d.nodeVersion)?.[1] ?? 0);
-  out.push({ name: 'Node.js 22 or newer', ok: major >= 22, detail: d.nodeVersion, fix: 'Install Node.js 22 LTS from https://nodejs.org' });
+  const [, maj, min] = /^v?(\d+)\.(\d+)/.exec(d.nodeVersion) ?? []; const major = Number(maj ?? 0), minor = Number(min ?? 0);
+  out.push({ name: 'Node.js 22.13 or newer', ok: major > 22 || (major === 22 && minor >= 13), detail: d.nodeVersion, fix: 'Install Node.js 22 LTS from https://nodejs.org' });
   out.push({ name: 'macOS', ok: d.platform === 'darwin', detail: d.platform, fix: 'flop-pilot v1 runs on macOS only' });
 
   const hasVault = existsSync(paths(d.home).vault);
