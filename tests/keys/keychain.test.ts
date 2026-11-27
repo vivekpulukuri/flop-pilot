@@ -35,3 +35,18 @@ test('other failures map to VaultLockedError', async () => {
   await expect(macKeychain(r.exec).get()).rejects.toBeInstanceOf(VaultLockedError);
   await expect(macKeychain(r.exec).set('x')).rejects.toBeInstanceOf(VaultLockedError);
 });
+
+test('keychainAccount is "vault" for the default home and unique per custom home', async () => {
+  const { keychainAccount } = await import('../../src/keys/keychain.js');
+  const { homedir } = await import('node:os');
+  expect(keychainAccount(`${homedir()}/.flop-pilot`)).toBe('vault');
+  const a = keychainAccount('/tmp/a/h');
+  expect(a).toMatch(/^vault:[0-9a-f]{12}$/);
+  expect(keychainAccount('/tmp/b/h')).not.toBe(a);
+});
+
+test('macKeychain uses the given account', async () => {
+  const r = recorder({ code: 0, stdout: 'x\n' });
+  await macKeychain(r.exec, 'vault:abc').get();
+  expect(r.calls[0].args).toContain('vault:abc');
+});

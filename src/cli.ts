@@ -4,14 +4,26 @@ import { readFileSync } from 'node:fs';
 import type { Network } from './core/types.js';
 import { pilotHome } from './core/paths.js';
 import { loadConfig } from './core/config.js';
-import { macKeychain } from './keys/keychain.js';
+import { macKeychain, keychainAccount } from './keys/keychain.js';
+import { existsSync } from 'node:fs';
+import { paths } from './core/paths.js';
 import { runInit } from './commands/init.js';
 import { setClaimers, setNetwork, setPractice } from './commands/settings.js';
 import { listWalletsCmd } from './commands/wallets.js';
 import { terminalIO } from './sys/prompt.js';
+import { realEnv } from './sys/env.js';
+import { createSdkChain, isSupportedSpec } from './chain/sdk-chain.js';
+import { NETWORK_PROFILES } from './core/networks.js';
+import { runDoctor, formatChecks } from './commands/doctor.js';
+import { isLoaded } from './autopilot/launchd.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
 export const VERSION = pkg.version;
+
+const keychain = (home: string) => macKeychain(undefined, keychainAccount(home));
+function requireSetup(home: string): void {
+  if (!existsSync(paths(home).vault)) throw new Error('flop-pilot is not set up yet. Run: flop-pilot init');
+}
 
 const program = new Command();
 program.name('flop-pilot').description('Autopilot for FLOP Testnet agents').version(VERSION);
@@ -21,14 +33,15 @@ program.command('init')
   .option('--restore', 'restore from an existing 24-word seed phrase')
   .option('--network <network>', 'devnet or testnet', 'devnet')
   .action(async (o: { restore?: boolean; network: Network }) => {
-    const io = terminalIO();
-    try { await runInit({ home: pilotHome(), network: o.network, restore: !!o.restore, io, store: macKeychain() }); }
+    const io = await terminalIO();
+    try { await runInit({ home: pilotHome(), network: o.network, restore: !!o.restore, io, store: keychain(pilotHome()) }); }
     finally { io.close(); }
   });
 
 program.command('wallets')
   .description('List your wallets')
   .action(async () => {
+    requireSetup(pilotHome());
     const rows = await listWalletsCmd(pilotHome());
     console.log(`Network: ${loadConfig(pilotHome()).network}`);
     for (const r of rows) console.log(`#${r.index}  ${r.address}  claimer:${r.claimer ? 'yes' : 'no'}  enrolled:${r.enrolled ? 'yes' : 'no'}${r.stopped ? '  STOPPED' : ''}`);
@@ -38,6 +51,7 @@ program.command('practice <onoff>')
   .description('Practice mode on|off (on = nothing is signed or sent)')
   .action((v: string) => {
     if (v !== 'on' && v !== 'off') throw new Error('Use: flop-pilot practice on   or   flop-pilot practice off');
+    requireSetup(pilotHome());
     setPractice(pilotHome(), v === 'on');
     console.log(`Practice mode is now ${v.toUpperCase()}.`);
   });
@@ -45,15 +59,33 @@ program.command('practice <onoff>')
 program.command('network <name>')
   .description('Switch the active network (devnet or testnet)')
   .action(async (n: Network) => {
-    await setNetwork(pilotHome(), n, macKeychain());
+    requireSetup(pilotHome());
+    await setNetwork(pilotHome(), n, keychain(pilotHome()));
     console.log(`Active network is now ${n}.`);
   });
 
 program.command('claimers <count>')
   .description('How many wallets claim from the faucet (1-3)')
   .action((k: string) => {
+    requireSetup(pilotHome());
     setClaimers(pilotHome(), Number(k));
     console.log(`Claiming wallets: ${k}.`);
+  });
+
+program.command('doctor')
+  .description('Check that everything is set up and reachable')
+  .action(async () => {
+    const home = pilotHome();
+    const c = loadConfig(home);
+    const env = realEnv({ version: VERSION });
+    const checks = await runDoctor({
+      home, store: keychain(home), nodeVersion: process.version, platform: process.platform,
+      chain: () => createSdkChain(c.network),
+      faucetChain: async () => (await (await env.fetch(`${NETWORK_PROFILES[c.network].faucet}/chain`, { signal: AbortSignal.timeout(15000) })).json()) as { network: string; genesisHash: string },
+      launchdLoaded: isLoaded, isSupportedSpec,
+    });
+    console.log(formatChecks(checks));
+    if (checks.some((x) => !x.ok)) process.exitCode = 1;
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
