@@ -15,12 +15,16 @@ import { realEnv } from './sys/env.js';
 import { createSdkChain, isSupportedSpec } from './chain/sdk-chain.js';
 import { NETWORK_PROFILES } from './core/networks.js';
 import { runDoctor, formatChecks } from './commands/doctor.js';
-import { isLoaded } from './autopilot/launchd.js';
+import { isLoaded, launchdLabel } from './autopilot/launchd.js';
+import { fileURLToPath } from 'node:url';
 import { createFaucet } from './faucet/sdk-faucet.js';
 import { runFund, formatResults } from './commands/fund.js';
 import { runEnroll } from './commands/enroll.js';
 import { runSpend } from './commands/spend.js';
 import { setActivationBlock } from './watchers/mode.js';
+import { runTick } from './autopilot/tick.js';
+import { autopilotOn, autopilotOff, autopilotStatus, stopAll } from './commands/autopilot.js';
+import { updateConfig } from './core/config.js';
 import { addMinerEndpoint, removeMinerEndpoint } from './commands/settings.js';
 import type { RuntimeDeps } from './runtime.js';
 
@@ -95,7 +99,7 @@ program.command('doctor')
       home, store: keychain(home), nodeVersion: process.version, platform: process.platform,
       chain: () => createSdkChain(c.network),
       faucetChain: async () => (await (await env.fetch(`${NETWORK_PROFILES[c.network].faucet}/chain`, { signal: AbortSignal.timeout(15000) })).json()) as { network: string; genesisHash: string },
-      launchdLoaded: isLoaded, isSupportedSpec,
+      launchdLoaded: () => isLoaded(launchdLabel(home)), isSupportedSpec, cliPath: fileURLToPath(import.meta.url),
     });
     console.log(formatChecks(checks));
     if (checks.some((x) => !x.ok)) process.exitCode = 1;
@@ -140,6 +144,41 @@ program.command('activation <block>')
     const c = loadConfig(pilotHome());
     setActivationBlock(pilotHome(), c.network, b === 'clear' ? null : Number(b));
     console.log(b === 'clear' ? 'Activation block cleared.' : `Earning starts at ${c.network} block ${b}.`);
+  });
+
+program.command('tick')
+  .description('Run one autopilot cycle now (this is what the background job runs)')
+  .action(async () => {
+    const s = await runTick(deps());
+    const stamp = new Date().toISOString();
+    console.log(`[${stamp}] tick ${s.skippedAll ? `skipped: ${s.skippedAll}` : `mode ${s.mode ?? 'unknown'}`}`);
+    if (s.actions.length) console.log(formatResults(s.actions));
+    for (const e of s.errors) console.log(`! ${e}`);
+  });
+
+const ap = program.command('autopilot').description('Background autopilot (runs every 15 minutes)');
+ap.command('on').action(async () => { requireSetup(pilotHome()); const f = await autopilotOn(pilotHome()); console.log(`Autopilot ON (runs every ${loadConfig(pilotHome()).tickMinutes} min). Agent file: ${f}`); });
+ap.command('off').action(async () => { await autopilotOff(pilotHome()); console.log('Autopilot OFF.'); });
+ap.command('status').action(async () => {
+  requireSetup(pilotHome());
+  const st = await autopilotStatus(pilotHome());
+  console.log(`Autopilot: ${st.loaded ? 'ON' : 'OFF'}${st.killed ? ' (stopped by kill switch)' : ''}${st.paused ? ' (paused)' : ''} · practice mode ${st.practice ? 'ON' : 'OFF'}`);
+});
+
+program.command('pause').description('Pause claims and spends (watchers keep running)').action(() => { requireSetup(pilotHome()); updateConfig(pilotHome(), { paused: true }); console.log('Paused. Resume with: flop-pilot resume'); });
+program.command('resume').description('Resume after pause').action(() => { requireSetup(pilotHome()); updateConfig(pilotHome(), { paused: false }); console.log('Resumed.'); });
+
+program.command('stop')
+  .description('Kill switch: stop the autopilot now')
+  .option('--deactivate', 'also deactivate your agent wallets on chain (asks to confirm)')
+  .action(async (o: { deactivate?: boolean }) => {
+    requireSetup(pilotHome());
+    const io = await terminalIO();
+    try {
+      const rs = await stopAll(pilotHome(), { deactivate: o.deactivate, deps: deps(), confirm: () => io.ask('Type DEACTIVATE to confirm: ') });
+      console.log('Autopilot stopped. Start again with: flop-pilot autopilot on');
+      if (rs.length) console.log(formatResults(rs));
+    } finally { io.close(); }
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {

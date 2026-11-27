@@ -4,6 +4,7 @@ import { loadConfig } from '../core/config.js';
 import { paths } from '../core/paths.js';
 import { NETWORK_PROFILES } from '../core/networks.js';
 import { unlockSeed } from '../keys/vault.js';
+import { protectedFolder, protectedFolderHint } from '../autopilot/launchd.js';
 
 export interface Check { name: string; ok: boolean; warn?: boolean; detail?: string; fix?: string; }
 
@@ -16,6 +17,7 @@ export interface DoctorDeps {
   faucetChain: () => Promise<{ network: string; genesisHash: string }>;
   launchdLoaded: () => Promise<boolean>;
   isSupportedSpec: (v: number) => boolean;
+  cliPath?: string;
 }
 
 export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
@@ -56,6 +58,11 @@ export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
     out.push({ name: `Faucet is FLOP ${c.network === 'testnet' ? 'Testnet' : 'Devnet'}`, ok, detail: f.genesisHash, fix: `Faucet is not FLOP ${c.network === 'testnet' ? 'Testnet' : 'Devnet'} — stop` });
   } catch (e) {
     out.push({ name: `Faucet is FLOP ${c.network === 'testnet' ? 'Testnet' : 'Devnet'}`, ok: false, detail: (e as Error).message, fix: 'Faucet unreachable; try again later' });
+  }
+
+  if (d.cliPath) {
+    const blocked = protectedFolder(d.cliPath);
+    out.push({ name: 'Install location works with the autopilot', ok: !blocked, detail: d.cliPath, fix: blocked ? protectedFolderHint(blocked) : undefined });
   }
 
   const loaded = await d.launchdLoaded().catch(() => false);
